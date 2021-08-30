@@ -6,65 +6,35 @@ pub trait UI {
     fn get_user_move(&self) -> DynFuture<shakmaty::Move>;
 }
 
+fn make_moves(san_moves: &[&'static str]) -> Vec<shakmaty::Move> {
+    let mut result = Vec::new();
+    result.reserve_exact(san_moves.len());
+
+    let mut pos = shakmaty::Chess::default();
+    for m in san_moves {
+        let san: shakmaty::san::San = m.parse().unwrap();
+        let m = san.to_move(&pos).unwrap();
+
+        use shakmaty::Position;
+        pos = pos.play(&m).unwrap();
+
+        result.push(m);
+    }
+
+    result
+}
+
 pub async fn train(ui: impl UI) {
-    let moves = [
-        shakmaty::Move::Normal {
-            from: shakmaty::Square::E2,
-            to: shakmaty::Square::E4,
-            capture: None,
-            promotion: None,
-            role: shakmaty::Role::Pawn
-        },
-        shakmaty::Move::Normal {
-            from: shakmaty::Square::E7,
-            to: shakmaty::Square::E5,
-            capture: None,
-            promotion: None,
-            role: shakmaty::Role::Pawn
-        },
-        shakmaty::Move::Normal {
-            from: shakmaty::Square::G1,
-            to: shakmaty::Square::F3,
-            capture: None,
-            promotion: None,
-            role: shakmaty::Role::Knight
-        },
-        shakmaty::Move::Normal {
-            from: shakmaty::Square::G8,
-            to: shakmaty::Square::F6,
-            capture: None,
-            promotion: None,
-            role: shakmaty::Role::Knight
-        },
-        shakmaty::Move::Normal {
-            from: shakmaty::Square::F3,
-            to: shakmaty::Square::E5,
-            capture: Some(shakmaty::Role::Pawn),
-            promotion: None,
-            role: shakmaty::Role::Knight
-        },
-        shakmaty::Move::Normal {
-            from: shakmaty::Square::B8,
-            to: shakmaty::Square::C6,
-            capture: None,
-            promotion: None,
-            role: shakmaty::Role::Knight
-        },
-        shakmaty::Move::Normal {
-            from: shakmaty::Square::E5,
-            to: shakmaty::Square::C6,
-            capture: Some(shakmaty::Role::Knight),
-            promotion: None,
-            role: shakmaty::Role::Knight
-        },
-        shakmaty::Move::Normal {
-            from: shakmaty::Square::D7,
-            to: shakmaty::Square::C6,
-            capture: Some(shakmaty::Role::Knight),
-            promotion: None,
-            role: shakmaty::Role::Pawn
-        },
-    ];
+    let moves = make_moves(&[
+        "e4", "e5",
+        "Nf3", "Nf6",
+        "Nxe5", "Nc6",
+        "Nxc6", "dxc6",
+        "d3", "Bc5",
+        "Bg5", "Nxe4",
+        "Bxd8", "Bxf2",
+        "Ke2", "Bg4"
+    ]);
 
     let ui_trainer_move = |m: shakmaty::Move| {
         use crate::components::board::Arrow;
