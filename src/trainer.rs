@@ -1,17 +1,12 @@
 pub type DynFuture<T> = std::pin::Pin<Box<dyn std::future::Future<Output=T>>>;
 
 pub trait UI {
-    fn show_arrows(&mut self, arrows: Vec<crate::components::board::Arrow>);
-    fn play_move(&mut self, m: shakmaty::Move);
-    fn shake(&mut self);
-    fn get_user_move(&mut self) -> DynFuture<shakmaty::Move>;
+    fn play_move(&self, m: shakmaty::Move, arrows: Vec<crate::components::board::Arrow>);
+    fn shake(&self);
+    fn get_user_move(&self) -> DynFuture<shakmaty::Move>;
 }
 
-pub async fn test() -> bool {
-    false
-}
-
-pub async fn train(mut ui: impl UI) {
+pub async fn train(ui: impl UI) {
     let moves = [
         shakmaty::Move::Normal {
             from: shakmaty::Square::E2,
@@ -71,9 +66,16 @@ pub async fn train(mut ui: impl UI) {
         },
     ];
 
+    let ui_trainer_move = |m: shakmaty::Move| {
+        use crate::components::board::Arrow;
+
+        let arrows = vec![Arrow(m.from().unwrap(), m.to())];
+        ui.play_move(m, arrows);
+    };
+
     let mut iter = moves.iter();
     if let Some(trainer_move) = iter.next() {
-        ui.play_move(trainer_move.clone());
+        ui_trainer_move(trainer_move.clone());
     }
 
     while let Some(expected) = iter.next() {
@@ -86,11 +88,11 @@ pub async fn train(mut ui: impl UI) {
             }
         }
 
-        ui.play_move(expected.clone());
+        ui.play_move(expected.clone(), Vec::new());
 
         if let Some(trainer_move) = iter.next() {
             // TODO: Small timeout
-            ui.play_move(trainer_move.clone());
+            ui_trainer_move(trainer_move.clone());
         } else {
             break;
         }

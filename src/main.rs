@@ -3,7 +3,7 @@ mod components;
 mod trainer;
 
 enum GameMessage {
-    PlayMove(shakmaty::Move),
+    PlayMove(shakmaty::Move, Vec<components::board::Arrow>),
     RegisterMoveSender(async_oneshot::Sender<shakmaty::Move>)
 }
 
@@ -30,8 +30,6 @@ impl Component for Game {
     type Properties = ();
 
     fn create(_props: Self::Properties, link: ComponentLink<Self>) -> Self {
-        use shakmaty::Square;
-        use components::board::Arrow;
         Self {
             link: link,
             board_link_ref: Default::default(),
@@ -43,11 +41,12 @@ impl Component for Game {
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            GameMessage::PlayMove(m) => {
+            GameMessage::PlayMove(m, arrows) => {
                 use shakmaty::Position;
                 let mut board = (*self.board).clone();
                 board.play_unchecked(&m);
                 self.board = board.into();
+                self.arrows = arrows;
                 
                 true
             },
@@ -98,15 +97,11 @@ struct UI {
 }
 
 impl trainer::UI for UI {
-    fn show_arrows(&mut self, _arrows: Vec<crate::components::board::Arrow>) {
-        // TODO
+    fn play_move(&self, m: shakmaty::Move, arrows: Vec<components::board::Arrow>) {
+        self.link.send_message(GameMessage::PlayMove(m, arrows));
     }
 
-    fn play_move(&mut self, m: shakmaty::Move) {
-        self.link.send_message(GameMessage::PlayMove(m));
-    }
-
-    fn shake(&mut self) {
+    fn shake(&self) {
         if let Some(ref board_link) = *self.board_link_ref.borrow() {
             if let Some(comp) = board_link.get_component() {
                 comp.shake();
@@ -114,7 +109,7 @@ impl trainer::UI for UI {
         }
     }
 
-    fn get_user_move(&mut self) -> trainer::DynFuture<shakmaty::Move> {
+    fn get_user_move(&self) -> trainer::DynFuture<shakmaty::Move> {
         let (sender, receiver) = async_oneshot::oneshot();
 
         self.link.send_message(GameMessage::RegisterMoveSender(sender));
