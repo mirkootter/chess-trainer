@@ -1,0 +1,203 @@
+cb-container {
+  display: inline-block;
+  width: 100%;
+  max-width: 720px;
+  position: relative;
+
+  & svg {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    z-index: 20;
+    pointer-events: none;
+
+    & .red {
+      fill: rgba(255, 0, 0, 0.5);
+    }
+
+    & .green {
+      fill: rgba(0, 255, 0, 0.5);
+    }
+  }
+
+  & .a {
+    left: 0px;
+  }
+
+  & .b {
+    left: 12.5%;
+  }
+
+  & .c {
+    left: 25%;
+  }
+
+  & .d {
+    left: 37.5%;
+  }
+
+  & .e {
+    left: 50%;
+  }
+
+  & .f {
+    right: 25%;
+  }
+
+  & .g {
+    right: 12.5%;
+  }
+
+  & .h {
+    right: 0px;
+  }
+
+  & .row8 {
+    top: 0px;
+  }
+
+  & .row7 {
+    top: 12.5%;
+  }
+
+  & .row6 {
+    top: 25%;
+  }
+
+  & .row5 {
+    top: 37.5%;
+  }
+
+  & .row4 {
+    top: 50%;
+  }
+
+  & .row3 {
+    bottom: 25%;
+  }
+
+  & .row2 {
+    bottom: 12.5%;
+  }
+
+  & .row1 {
+    bottom: 0px;
+  }
+}
+
+cb-board {
+  z-index: 0;
+  background-color: #f0dab5;
+  background-image: linear-gradient(45deg, #b58863 25%, transparent 25%, transparent 75%, #b58863 75%), linear-gradient(45deg, #b58863 25%, transparent 25%, transparent 75%, #b58863 75%);
+  padding: 0px;
+  padding-bottom: 100%;
+  display: block;
+  background-size: 25% 25%;
+  background-position: 0 0, 50% 50%;
+}
+
+cb-piece {
+  position: absolute;
+  background-size: 100%;
+  display: inline-block;
+  width: 12.5%;
+  height: 12.5%;
+  z-index: 10;
+
+  &.king {
+    &.black {
+      background-image: url("/images/pieces/Chess_kdt45.svg");
+    }
+    &.white {
+      background-image: url("/images/pieces/Chess_klt45.svg");
+    }
+  }
+
+  &.queen {
+    &.black {
+      background-image: url("/images/pieces/Chess_qdt45.svg");
+    }
+    &.white {
+      background-image: url("/images/pieces/Chess_qlt45.svg");
+    }
+  }
+
+  &.rook {
+    &.black {
+      background-image: url("/images/pieces/Chess_rdt45.svg");
+    }
+    &.white {
+      background-image: url("/images/pieces/Chess_rlt45.svg");
+    }
+  }
+
+  &.bishop {
+    &.black {
+      background-image: url("/images/pieces/Chess_bdt45.svg");
+    }
+    &.white {
+      background-image: url("/images/pieces/Chess_blt45.svg");
+    }
+  }
+
+  &.knight {
+    &.black {
+      background-image: url("/images/pieces/Chess_ndt45.svg");
+    }
+    &.white {
+      background-image: url("/images/pieces/Chess_nlt45.svg");
+    }
+  }
+
+  &.pawn {
+    &.black {
+      background-image: url("/images/pieces/Chess_pdt45.svg");
+    }
+    &.white {
+      background-image: url("/images/pieces/Chess_plt45.svg");
+    }
+  }
+}
+
+cb-point-marker {
+  position: absolute;
+  display: inline-block;
+  width: 12.5%;
+  height: 12.5%;
+  z-index: 15;
+
+  &.capture::before {
+    position: absolute;
+    display: inline-block;
+    content: '';
+    left: 3px;
+    right: 3px;
+    bottom: 3px;
+    top: 3px;
+    border: 3px solid rgba(0,0,100,0.4);
+  }
+
+  &:not(.capture)::after {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    margin-left: -15%;
+    margin-top: -15%;
+    border-radius: 50%;
+    display: inline-block;
+    content: '';
+    background-color: rgba(0,0,100,0.4);
+    width: 30%;
+    height: 30%;
+  }
+}
+
+cb-square-marker {
+  position: absolute;
+  display: inline-block;
+  width: 12.5%;
+  height: 12.5%;
+  background-color: rgba(0,0,100,0.4);
+}
