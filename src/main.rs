@@ -1,8 +1,10 @@
 use yew::prelude::*;
 mod components;
+mod trainer;
 
 enum GameMessage {
-    PlayMove(shakmaty::Move)
+    PlayMove(shakmaty::Move),
+    RegisterMoveSender(async_oneshot::Sender<shakmaty::Move>)
 }
 
 struct Game {
@@ -11,7 +13,16 @@ struct Game {
     link: ComponentLink<Self>,
     board_link_ref: components::board::LinkRef,
     board: std::rc::Rc<shakmaty::Chess>,
-    arrows: Vec<components::board::Arrow>
+    arrows: Vec<components::board::Arrow>,
+    move_sender: Option<std::cell::RefCell<async_oneshot::Sender<shakmaty::Move>>>
+}
+
+impl Game {
+    fn send_user_move_internal(&self, m: shakmaty::Move) {
+        if let Some(sender) = &self.move_sender {
+            let _ = sender.borrow_mut().send(m);
+        }
+    }
 }
 
 impl Component for Game {
@@ -25,7 +36,8 @@ impl Component for Game {
             link: link,
             board_link_ref: Default::default(),
             board: std::rc::Rc::new(shakmaty::Chess::default()),
-            arrows: vec![Arrow(Square::E2, Square::E4), Arrow(Square::B1, Square::C3)]
+            arrows: Vec::new(),
+            move_sender: None
         }
     }
 
@@ -38,6 +50,10 @@ impl Component for Game {
                 self.board = board.into();
                 
                 true
+            },
+            GameMessage::RegisterMoveSender(sender) => {
+                self.move_sender = Some(sender.into());
+                false
             }
         }
     }
@@ -49,20 +65,20 @@ impl Component for Game {
         false
     }
 
+    fn rendered(&mut self, first_render: bool) {
+        if first_render {
+            wasm_bindgen_futures::spawn_local(trainer::train(UI {
+                link: self.link.clone(),
+                board_link_ref: self.board_link_ref.clone()
+            }))
+        }
+    }
+
     fn view(&self) -> Html {
         let link = self.link.clone();
-        let board_link_ref = self.board_link_ref.clone(); 
         let on_user_move: yew::Callback<shakmaty::Move> = (move |m: shakmaty::Move| {
-            if m.from() == Some(shakmaty::Square::E2) && m.to() == shakmaty::Square::E4 {
-                link.send_message(GameMessage::PlayMove(m));
-            } else {
-                // Shake
-                if let Some(ref board_link) = *board_link_ref.borrow() {
-                    if let Some(comp) = board_link.get_component() {
-                        comp.shake();
-                    }
-                }
-                
+            if let Some(game) = link.get_component() {
+                game.send_user_move_internal(m);
             }
         }).into();
 
@@ -73,6 +89,39 @@ impl Component for Game {
                 on_user_move=on_user_move
                 link_ref=self.board_link_ref.clone() />
         }
+    }
+}
+
+struct UI {
+    link: ComponentLink<Game>,
+    board_link_ref: components::board::LinkRef
+}
+
+impl trainer::UI for UI {
+    fn show_arrows(&mut self, _arrows: Vec<crate::components::board::Arrow>) {
+        // TODO
+    }
+
+    fn play_move(&mut self, m: shakmaty::Move) {
+        self.link.send_message(GameMessage::PlayMove(m));
+    }
+
+    fn shake(&mut self) {
+        if let Some(ref board_link) = *self.board_link_ref.borrow() {
+            if let Some(comp) = board_link.get_component() {
+                comp.shake();
+            }
+        }
+    }
+
+    fn get_user_move(&mut self) -> trainer::DynFuture<shakmaty::Move> {
+        let (sender, receiver) = async_oneshot::oneshot();
+
+        self.link.send_message(GameMessage::RegisterMoveSender(sender));
+
+        Box::pin(async move {
+            receiver.await.unwrap()
+        })
     }
 }
 
