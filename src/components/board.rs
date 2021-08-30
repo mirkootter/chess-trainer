@@ -1,17 +1,14 @@
+pub type LinkRef = std::rc::Rc<std::cell::RefCell<Option<yew::ComponentLink<Board>>>>;
+
 #[derive(Clone)]
 pub struct Arrow(pub shakmaty::Square, pub shakmaty::Square);
 
 #[derive(yew::Properties, Clone)]
 pub struct BoardProps {
+    pub link_ref: LinkRef,
     pub board: std::rc::Rc<shakmaty::Chess>,
     pub arrows: Vec<Arrow>,
-    pub on_user_move: std::rc::Rc<dyn Fn(shakmaty::Move) -> BoardAction>
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum BoardAction {
-    None,
-    Shake
+    pub on_user_move: yew::Callback<shakmaty::Move>
 }
 
 pub struct Board {
@@ -20,14 +17,16 @@ pub struct Board {
     selected: Option<shakmaty::Square>,
     arrows: Vec<Arrow>,
     container_ref: yew::NodeRef,
-    on_user_move: std::rc::Rc<dyn Fn(shakmaty::Move) -> BoardAction>
+    on_user_move: yew::Callback<shakmaty::Move>
 }
 
-fn shake(node_ref: &yew::NodeRef) {
-    if let Some(elem) = node_ref.cast::<web_sys::HtmlElement>() {
-        elem.set_class_name("");
-        elem.offset_height();
-        elem.set_class_name("shake-animation");
+impl Board {
+    pub fn shake(&self) {
+        if let Some(elem) = self.container_ref.cast::<web_sys::HtmlElement>() {
+            elem.set_class_name("");
+            elem.offset_height();
+            elem.set_class_name("shake-animation");
+        }
     }
 }
 
@@ -78,6 +77,7 @@ impl yew::Component for Board {
     type Properties = BoardProps;
 
     fn create(props: Self::Properties, link: yew::ComponentLink<Self>) -> Self {
+        *props.link_ref.borrow_mut() = Some(link.clone());
         Self {
             link,
             board: props.board,
@@ -186,13 +186,9 @@ impl yew::Component for Board {
                                 class_name += " capture";
                             }
 
-                            let node_ref = self.container_ref.clone();
                             let on_user_move = self.on_user_move.clone();
                             let on_user_move: yew::Callback<yew::MouseEvent> = (move |_| {
-                                match on_user_move(m.clone()) {
-                                    BoardAction::None => {},
-                                    BoardAction::Shake => shake(&node_ref)
-                                }
+                                on_user_move.emit(m.clone());
                             }).into();
 
                             yew::html! {
