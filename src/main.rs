@@ -86,7 +86,8 @@ impl Component for Game {
                 board=self.board.clone()
                 arrows=self.arrows.clone()
                 on_user_move=on_user_move
-                link_ref=self.board_link_ref.clone() />
+                link_ref=self.board_link_ref.clone()
+                reverse=true />
         }
     }
 }

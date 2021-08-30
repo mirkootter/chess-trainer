@@ -8,7 +8,8 @@ pub struct BoardProps {
     pub link_ref: LinkRef,
     pub board: std::rc::Rc<shakmaty::Chess>,
     pub arrows: Vec<Arrow>,
-    pub on_user_move: yew::Callback<shakmaty::Move>
+    pub on_user_move: yew::Callback<shakmaty::Move>,
+    pub reverse: bool
 }
 
 pub struct Board {
@@ -17,7 +18,8 @@ pub struct Board {
     selected: Option<shakmaty::Square>,
     arrows: Vec<Arrow>,
     container_ref: yew::NodeRef,
-    on_user_move: yew::Callback<shakmaty::Move>
+    on_user_move: yew::Callback<shakmaty::Move>,
+    reverse: bool
 }
 
 impl Board {
@@ -33,7 +35,7 @@ impl Board {
 const COL_CLASSES: [&'static str; 8] = ["a", "b", "c", "d", "e", "f", "g", "h"];
 const ROW_CLASSES: [&'static str; 8] = [" row1", " row2", " row3", " row4", " row5", " row6", " row7", " row8"];
 
-fn get_class_for_piece(piece: shakmaty::Piece, square: shakmaty::Square) -> String {
+fn get_class_for_piece(piece: shakmaty::Piece, square: shakmaty::Square, reverse: bool) -> String {
     let mut result = String::new();
     result.reserve(19); // "bishop black a row8" longest possible classname
 
@@ -51,18 +53,24 @@ fn get_class_for_piece(piece: shakmaty::Piece, square: shakmaty::Square) -> Stri
         shakmaty::Color::White => result += " white ",
     }
 
-    result += COL_CLASSES[square.file() as usize];
-    result += ROW_CLASSES[square.rank() as usize];
+    let col = if reverse { 7 - square.file() as usize } else { square.file() as usize };
+    let row = if reverse { 7 - square.rank() as usize } else { square.rank() as usize };
+
+    result += COL_CLASSES[col];
+    result += ROW_CLASSES[row];
 
     result
 }
 
-fn get_class_for_position(square: shakmaty::Square) -> String {
+fn get_class_for_position(square: shakmaty::Square, reverse: bool) -> String {
     let mut result = String::new();
     result.reserve(5);
 
-    result += COL_CLASSES[square.file() as usize];
-    result += ROW_CLASSES[square.rank() as usize];
+    let col = if reverse { 7 - square.file() as usize } else { square.file() as usize };
+    let row = if reverse { 7 - square.rank() as usize } else { square.rank() as usize };
+
+    result += COL_CLASSES[col];
+    result += ROW_CLASSES[row];
 
     result
 }
@@ -84,7 +92,8 @@ impl yew::Component for Board {
             selected: None,
             arrows: props.arrows,
             container_ref: yew::NodeRef::default(),
-            on_user_move: props.on_user_move
+            on_user_move: props.on_user_move,
+            reverse: props.reverse
         }
     }
 
@@ -101,6 +110,8 @@ impl yew::Component for Board {
     fn change(&mut self, props: Self::Properties) -> yew::ShouldRender {
         self.board = props.board;
         self.arrows = props.arrows;
+        self.on_user_move = props.on_user_move;
+        self.reverse = props.reverse;
 
         self.selected = None;
         true // TODO: Some check maybe?
@@ -133,9 +144,11 @@ impl yew::Component for Board {
             result
         };
 
+        let reverse = self.reverse;
+
         let make_arrow = |from: shakmaty::Square, to: shakmaty::Square| {
-            let x0 = from.file() as u8 as f32;
-            let y0 = 7.0 - from.rank() as u8 as f32;
+            let mut x0 = from.file() as u8 as f32;
+            let mut y0 = 7.0 - from.rank() as u8 as f32;
             let x1 = to.file() as u8 as f32;
             let y1 = 7.0 - to.rank() as u8 as f32;
 
@@ -144,7 +157,12 @@ impl yew::Component for Board {
 
             let length = (dx * dx + dy * dy).sqrt();
 
-            let angle = dy.atan2(dx).to_degrees() - 90.0f32;
+            let mut angle = dy.atan2(dx).to_degrees() - 90.0f32;
+            if reverse {
+                angle += 180.0;
+                x0 = 7.0 - x0;
+                y0 = 7.0 - y0;
+            }
             let transform = format!("translate({},{}) rotate({})", x0, y0, angle);
 
             yew::html_nested! {
@@ -159,7 +177,7 @@ impl yew::Component for Board {
                     {
                         use shakmaty::Setup;
                         self.board.board().pieces().map(|(square, piece)| {
-                            let class_name = get_class_for_piece(piece, square);
+                            let class_name = get_class_for_piece(piece, square, reverse);
 
                             yew::html! {
                                 <cb-piece class={class_name} onmousedown=self.link.callback(move |_|
@@ -172,7 +190,7 @@ impl yew::Component for Board {
                 {
                     if let Some(selected) = self.selected {
                         yew::html! {
-                            <cb-square-marker class={get_class_for_position(selected)} />
+                            <cb-square-marker class={get_class_for_position(selected, reverse)} />
                         }
                     } else {
                         yew::html! {}
@@ -181,7 +199,7 @@ impl yew::Component for Board {
                 {
                     if let Some(moves) = moves {
                         moves.map(|m| {
-                            let mut class_name = get_class_for_position(m.to());
+                            let mut class_name = get_class_for_position(m.to(), reverse);
                             if m.is_capture() {
                                 class_name += " capture";
                             }
