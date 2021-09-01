@@ -1,0 +1,34 @@
+.switch {
+  font-size: 10em;
+  box-sizing: border-box;
+  position: relative;
+  width: 1em;
+  height: 0.1em;
+  border-radius: 0.5em;
+  border: 0.015em solid #9f9f9f;
+  display: inline-block;
+  margin: 0.26em 0.15em;
+  cursor: pointer;
+
+  & input {
+    position: absolute;
+    visibility: hidden;
+  }
+
+  & div::after {
+    position: absolute;
+    top: 0;
+    left: 30%;
+    width: 50%;
+    font-size: 0.35em;
+    text-align: center;
+    content: '🤓';
+    transform: translate(-50%,-50%);
+    transition: all 300ms;
+  }
+
+  & input:checked + div::after {
+    left: 70%;
+    content: '😎';
+  }
+}

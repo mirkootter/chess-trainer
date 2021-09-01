@@ -82,12 +82,21 @@ impl Component for Game {
         }).into();
 
         html! {
-            <components::board::Board
-                board=self.board.clone()
-                arrows=self.arrows.clone()
-                on_user_move=on_user_move
-                link_ref=self.board_link_ref.clone()
-                reverse=true />
+            <div class="game">
+                <components::board::Board
+                    board=self.board.clone()
+                    arrows=self.arrows.clone()
+                    on_user_move=on_user_move
+                    link_ref=self.board_link_ref.clone()
+                    reverse=true />
+                <div>
+                    <label class="switch">
+                        <input type="checkbox" />
+                        <div />
+                    </label>
+                    {"Lernmodus (Pfeile anzeigen)"}
+                </div>
+            </div>
         }
     }
 }

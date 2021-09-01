@@ -36,16 +36,19 @@ pub async fn train(ui: impl UI) {
         "Ke2", "Bg4"
     ]);
 
-    let ui_trainer_move = |m: shakmaty::Move| {
+    let ui_trainer_move = |m: shakmaty::Move, hint: Option<shakmaty::Move>| {
         use crate::components::board::Arrow;
 
-        let arrows = vec![Arrow(m.from().unwrap(), m.to())];
+        let mut arrows = vec![Arrow(m.from().unwrap(), m.to())];
+        if let Some(hint) = hint {
+            arrows.push(Arrow(hint.from().unwrap(), hint.to()));
+        }
         ui.play_move(m, arrows);
     };
 
     let mut iter = moves.iter();
     if let Some(trainer_move) = iter.next() {
-        ui_trainer_move(trainer_move.clone());
+        ui_trainer_move(trainer_move.clone(), iter.clone().next().cloned());
     }
 
     while let Some(expected) = iter.next() {
@@ -62,7 +65,7 @@ pub async fn train(ui: impl UI) {
 
         if let Some(trainer_move) = iter.next() {
             // TODO: Small timeout
-            ui_trainer_move(trainer_move.clone());
+            ui_trainer_move(trainer_move.clone(), iter.clone().next().cloned());
         } else {
             break;
         }

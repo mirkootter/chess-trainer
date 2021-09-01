@@ -1,4 +1,5 @@
 @import "./board.scss";
+@import "./switch.scss";
 
 .shake-animation {
   animation: shake 0.25s;
@@ -17,4 +18,16 @@
   80% { transform: translate(-1px, -1px) rotate(1deg); }
   90% { transform: translate(1px, 2px) rotate(0deg); }
   100% { transform: translate(1px, -2px) rotate(-1deg); }
+}
+
+.game {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.game > div {
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
