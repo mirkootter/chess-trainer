@@ -1,5 +1,6 @@
 use yew::prelude::*;
 mod components;
+mod pgn_lexer;
 mod trainer;
 
 enum GameMessage {
