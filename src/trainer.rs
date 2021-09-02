@@ -4,6 +4,7 @@ pub trait UI {
     fn play_move(&self, m: shakmaty::Move, arrows: Vec<crate::components::board::Arrow>);
     fn shake(&self);
     fn get_user_move(&self) -> DynFuture<shakmaty::Move>;
+    fn show_hints(&self) -> bool;
 }
 
 fn make_moves(san_moves: &[&'_ str]) -> Vec<shakmaty::Move> {
@@ -125,7 +126,9 @@ pub async fn train(ui: impl UI) {
 
         let mut arrows = vec![Arrow(m.from().unwrap(), m.to())];
         if let Some(hint) = hint {
-            arrows.push(Arrow(hint.from().unwrap(), hint.to()));
+            if ui.show_hints() {
+                arrows.push(Arrow(hint.from().unwrap(), hint.to()));
+            }
         }
         ui.play_move(m, arrows);
     };

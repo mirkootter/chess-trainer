@@ -5,7 +5,8 @@ mod trainer;
 
 enum GameMessage {
     PlayMove(shakmaty::Move, Vec<components::board::Arrow>),
-    RegisterMoveSender(async_oneshot::Sender<shakmaty::Move>)
+    RegisterMoveSender(async_oneshot::Sender<shakmaty::Move>),
+    SetLearning(bool)
 }
 
 struct Game {
@@ -15,7 +16,9 @@ struct Game {
     board_link_ref: components::board::LinkRef,
     board: std::rc::Rc<shakmaty::Chess>,
     arrows: Vec<components::board::Arrow>,
-    move_sender: Option<std::cell::RefCell<async_oneshot::Sender<shakmaty::Move>>>
+    move_sender: Option<std::cell::RefCell<async_oneshot::Sender<shakmaty::Move>>>,
+    learning_input_ref: yew::NodeRef,
+    learning: bool
 }
 
 impl Game {
@@ -36,7 +39,9 @@ impl Component for Game {
             board_link_ref: Default::default(),
             board: std::rc::Rc::new(shakmaty::Chess::default()),
             arrows: Vec::new(),
-            move_sender: None
+            move_sender: None,
+            learning_input_ref: Default::default(),
+            learning: true
         }
     }
 
@@ -54,6 +59,10 @@ impl Component for Game {
             GameMessage::RegisterMoveSender(sender) => {
                 self.move_sender = Some(sender.into());
                 false
+            },
+            GameMessage::SetLearning(learning) => {
+                self.learning = learning;
+                true
             }
         }
     }
@@ -82,6 +91,15 @@ impl Component for Game {
             }
         }).into();
 
+        let learning_ref = self.learning_input_ref.clone();
+        let on_learning_change = self.link.callback(move |e| {
+            if let Some(input) = learning_ref.cast::<web_sys::HtmlInputElement>() {
+                GameMessage::SetLearning(input.checked())
+            } else {
+                GameMessage::SetLearning(true)
+            }
+        });
+
         html! {
             <div class="game">
                 <components::board::Board
@@ -92,7 +110,7 @@ impl Component for Game {
                     reverse=true />
                 <div>
                     <label class="switch">
-                        <input type="checkbox" />
+                        <input type="checkbox" ref=self.learning_input_ref.clone() checked=self.learning onclick=on_learning_change />
                         <div />
                     </label>
                     {"Lernmodus (Pfeile anzeigen)"}
@@ -128,6 +146,14 @@ impl trainer::UI for UI {
         Box::pin(async move {
             receiver.await.unwrap()
         })
+    }
+
+    fn show_hints(&self) -> bool {
+        if let Some(game) = self.link.get_component() {
+            return game.learning;
+        }
+
+        true
     }
 }
 
