@@ -8,7 +8,9 @@
   border: 0.015em solid #9f9f9f;
   display: inline-block;
   margin: 0.26em 0.15em;
+  user-select: none;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 
   & input {
     position: absolute;
