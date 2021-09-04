@@ -8,108 +8,14 @@ pub trait UI {
     fn show_hints(&self) -> bool;
 }
 
-fn make_moves(san_moves: &[&'_ str]) -> Vec<shakmaty::Move> {
-    let mut result = Vec::new();
-    result.reserve_exact(san_moves.len());
-
-    let mut pos = shakmaty::Chess::default();
-    for m in san_moves {
-        let san: shakmaty::san::San = m.parse().unwrap();
-        let m = san.to_move(&pos).unwrap();
-
-        use shakmaty::Position;
-        pos = pos.play(&m).unwrap();
-
-        result.push(m);
-    }
-
-    result
-}
-
-struct MoveTreeNode<'source> {
-    parent: Option<std::rc::Rc<Self>>,
-    moves: Vec<&'source str>
-}
-
-impl<'source> MoveTreeNode<'source> {
-    fn new() -> Self {
-        (Self {
-            parent: None,
-            moves: Vec::new()
-        }).into()
-    }
-
-    fn push(&mut self, m: &'source str) {
-        self.moves.push(m);
-    }
-
-    fn fork(self) -> (Self, Self) {
-        let this: std::rc::Rc<Self> = self.into();
-        let a = Self {
-            parent: Some(this.clone()),
-            moves: Vec::new()
-        };
-        let b = Self {
-            parent: Some(this),
-            moves: Vec::new()
-        };
-
-        (a, b)
-    }
-
-    fn resolve(&self) -> Vec<&'source str> {
-        let mut moves = match &self.parent {
-            None => Vec::new(),
-            Some(node) => node.resolve()
-        };
-
-        moves.extend_from_slice(&self.moves);
-        moves
-    }
-
-    fn parse_internal(self, iter: &mut crate::pgn_lexer::TokenIterator<'source>, variants: &mut Vec<Self>) {
-        let mut main = self;
-        while let Some(token) = iter.next() {
-            match token {
-                crate::pgn_lexer::Token::StartVariation => {
-                    let last_move = main.moves.pop().unwrap(); // This move is not used in the variation
-                    let (new_main, variant) = main.fork();
-                    variant.parse_internal(iter, variants);
-                    main = new_main;
-                    main.push(last_move);
-                },
-                crate::pgn_lexer::Token::EndVariation => {
-                    break;
-                },
-                crate::pgn_lexer::Token::SanMove(m) => {
-                    main.push(std::str::from_utf8(m).unwrap())
-                },
-                _ => {}
-            }
-        }
-
-        variants.push(main);
-    }
-
-    fn parse(pgn: &'source str) -> Vec<Self> {
-        let mut result = Vec::new();
-        let root = Self::new();
-
-        let mut iter = crate::pgn_lexer::TokenIterator::new(pgn.as_bytes());
-
-        root.parse_internal(&mut iter, &mut result);
-        result
-    }
-}
-
 pub async fn train(ui: impl UI) {
     let pgn = include_str!("../data/stafford.pgn");
-    let variants = MoveTreeNode::parse(pgn);
+    let variants = crate::pgn::movetree::Node::parse(pgn);
     let moves = {
         use rand::seq::SliceRandom;
         let variant = variants.choose(&mut rand::thread_rng()).unwrap();
         
-        make_moves(&variant.resolve())
+        crate::pgn::movetree::make_moves(&variant.resolve())
     };
     
     let ui_trainer_move = |m: shakmaty::Move, hint: Option<shakmaty::Move>| {

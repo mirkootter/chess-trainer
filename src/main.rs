@@ -1,6 +1,6 @@
 use yew::prelude::*;
 mod components;
-mod pgn_lexer;
+mod pgn;
 mod trainer;
 mod util;
 
