@@ -1,4 +1,4 @@
-pub type DynFuture<T> = std::pin::Pin<Box<dyn std::future::Future<Output=T>>>;
+use crate::util::DynFuture;
 
 pub trait UI {
     fn play_move(&self, m: shakmaty::Move, arrows: Vec<crate::components::board::Arrow>);
@@ -102,7 +102,7 @@ impl<'source> MoveTreeNode<'source> {
 
     fn parse(pgn: &'source str) -> Vec<Self> {
         let mut result = Vec::new();
-        let mut root = Self::new();
+        let root = Self::new();
 
         let mut iter = crate::pgn_lexer::PGNTokenIterator::new(pgn.as_bytes());
 

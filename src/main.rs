@@ -2,6 +2,7 @@ use yew::prelude::*;
 mod components;
 mod pgn_lexer;
 mod trainer;
+mod util;
 
 enum GameMessage {
     PlayMove(shakmaty::Move, Vec<components::board::Arrow>),
@@ -138,14 +139,10 @@ impl trainer::UI for UI {
         }
     }
 
-    fn get_user_move(&self) -> trainer::DynFuture<shakmaty::Move> {
-        let (sender, receiver) = async_oneshot::oneshot();
-
+    fn get_user_move(&self) -> util::DynFuture<shakmaty::Move> {
+        let (sender, receiver) = util::oneshot();
         self.link.send_message(GameMessage::RegisterMoveSender(sender));
-
-        Box::pin(async move {
-            receiver.await.unwrap()
-        })
+        receiver
     }
 
     fn show_hints(&self) -> bool {
