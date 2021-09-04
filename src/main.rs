@@ -108,18 +108,23 @@ impl Component for Game {
 
         html! {
             <div class="game">
+                <div class="game-header">
+                    <label class="switch">
+                        <input type="checkbox" ref=self.learning_input_ref.clone() checked=!self.learning onclick=on_learning_change />
+                        <div />
+                    </label>
+                    {if self.learning {"Lernmodus (Pfeile anzeigen)"} else {"Übungsmodus (ohne Pfeile)"}}
+                </div>
                 <components::board::Board
                     board=self.board.clone()
                     arrows=self.arrows.clone()
                     on_user_move=on_user_move
                     link_ref=self.board_link_ref.clone()
                     reverse=true />
-                <div>
-                    <label class="switch">
-                        <input type="checkbox" ref=self.learning_input_ref.clone() checked=!self.learning onclick=on_learning_change />
-                        <div />
-                    </label>
-                    {if self.learning {"Lernmodus (Pfeile anzeigen)"} else {"Übungsmodus (ohne Pfeile)"}}
+                <div class="desktop-flex-break" />
+                <div class="game-footer">
+                    <components::iconbutton::IconButton image="images/icons/refresh_black_24dp.svg" />
+                    <components::iconbutton::IconButton image="images/icons/double_arrow_black_24dp.svg" />
                 </div>
             </div>
         }
