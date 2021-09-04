@@ -6,6 +6,7 @@ mod util;
 
 enum GameMessage {
     PlayMove(shakmaty::Move, Vec<components::board::Arrow>),
+    UpdateArrows(Vec<components::board::Arrow>),
     RegisterMoveSender(async_oneshot::Sender<shakmaty::Move>),
     SetLearning(bool)
 }
@@ -55,6 +56,10 @@ impl Component for Game {
                 self.board = board.into();
                 self.arrows = arrows;
                 
+                true
+            },
+            GameMessage::UpdateArrows(arrows) => {
+                self.arrows = arrows;
                 true
             },
             GameMessage::RegisterMoveSender(sender) => {
@@ -129,6 +134,10 @@ struct UI {
 impl trainer::UI for UI {
     fn play_move(&self, m: shakmaty::Move, arrows: Vec<components::board::Arrow>) {
         self.link.send_message(GameMessage::PlayMove(m, arrows));
+    }
+
+    fn update_arrows(&self, arrows: Vec<components::board::Arrow>) {
+        self.link.send_message(GameMessage::UpdateArrows(arrows))
     }
 
     fn shake(&self) {

@@ -2,6 +2,7 @@ use crate::util::DynFuture;
 
 pub trait UI {
     fn play_move(&self, m: shakmaty::Move, arrows: Vec<crate::components::board::Arrow>);
+    fn update_arrows(&self, arrows: Vec<crate::components::board::Arrow>);
     fn shake(&self);
     fn get_user_move(&self) -> DynFuture<shakmaty::Move>;
     fn show_hints(&self) -> bool;
@@ -129,12 +130,22 @@ pub async fn train(ui: impl UI) {
     }
 
     while let Some(expected) = iter.next() {
+        let mut errors = 0;
         loop {
             let user_move = ui.get_user_move().await;
             if &user_move == expected {
                 break;
             } else {
                 ui.shake();
+                errors = errors + 1;
+
+                if errors == 3 {
+                    // wait a small delay for the shake to end
+                    crate::util::sleep(300).await;
+
+                    use crate::components::board::Arrow;
+                    ui.update_arrows(vec![Arrow(expected.from().unwrap(), expected.to())]);
+                }
             }
         }
 
