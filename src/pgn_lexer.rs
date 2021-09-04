@@ -20,7 +20,6 @@ impl<'source> Iterator for TokenIterator<'source> {
     fn next(&mut self) -> Option<Self::Item> {
         let input = self.0;
         let (input, _) = nom::bytes::complete::take_while::<_, _, nom::error::Error<_>>(nom::character::is_space)(input).unwrap();
-        //gloo_console::log!("Huhu", std::str::from_utf8(&input[..10]).unwrap());
         if input.is_empty() {
             self.0 = input;
             None
