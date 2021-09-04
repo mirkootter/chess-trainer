@@ -94,7 +94,7 @@ impl Component for Game {
         let learning_ref = self.learning_input_ref.clone();
         let on_learning_change = self.link.callback(move |e| {
             if let Some(input) = learning_ref.cast::<web_sys::HtmlInputElement>() {
-                GameMessage::SetLearning(input.checked())
+                GameMessage::SetLearning(!input.checked())
             } else {
                 GameMessage::SetLearning(true)
             }
@@ -110,10 +110,10 @@ impl Component for Game {
                     reverse=true />
                 <div>
                     <label class="switch">
-                        <input type="checkbox" ref=self.learning_input_ref.clone() checked=self.learning onclick=on_learning_change />
+                        <input type="checkbox" ref=self.learning_input_ref.clone() checked=!self.learning onclick=on_learning_change />
                         <div />
                     </label>
-                    {"Lernmodus (Pfeile anzeigen)"}
+                    {if self.learning {"Lernmodus (Pfeile anzeigen)"} else {"Übungsmodus (ohne Pfeile)"}}
                 </div>
             </div>
         }
