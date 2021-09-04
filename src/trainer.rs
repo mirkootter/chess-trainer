@@ -67,21 +67,21 @@ impl<'source> MoveTreeNode<'source> {
         moves
     }
 
-    fn parse_internal(self, iter: &mut crate::pgn_lexer::PGNTokenIterator<'source>, variants: &mut Vec<Self>) {
+    fn parse_internal(self, iter: &mut crate::pgn_lexer::TokenIterator<'source>, variants: &mut Vec<Self>) {
         let mut main = self;
         while let Some(token) = iter.next() {
             match token {
-                crate::pgn_lexer::Token::StartVariation(_) => {
+                crate::pgn_lexer::Token::StartVariation => {
                     let last_move = main.moves.pop().unwrap(); // This move is not used in the variation
                     let (new_main, variant) = main.fork();
                     variant.parse_internal(iter, variants);
                     main = new_main;
                     main.push(last_move);
                 },
-                crate::pgn_lexer::Token::EndVariation(_) => {
+                crate::pgn_lexer::Token::EndVariation => {
                     break;
                 },
-                crate::pgn_lexer::Token::Move(m) => {
+                crate::pgn_lexer::Token::SanMove(m) => {
                     main.push(std::str::from_utf8(m).unwrap())
                 },
                 _ => {}
@@ -95,7 +95,7 @@ impl<'source> MoveTreeNode<'source> {
         let mut result = Vec::new();
         let root = Self::new();
 
-        let mut iter = crate::pgn_lexer::PGNTokenIterator::new(pgn.as_bytes());
+        let mut iter = crate::pgn_lexer::TokenIterator::new(pgn.as_bytes());
 
         root.parse_internal(&mut iter, &mut result);
         result
