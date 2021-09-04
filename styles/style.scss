@@ -1,6 +1,11 @@
 @import "./board.scss";
 @import "./switch.scss";
 
+body {
+  // prevent scroll on safari ios
+  touch-action: none;
+}
+
 .shake-animation {
   animation: shake 0.25s;
   animation-iteration-count: 1;
@@ -27,11 +32,6 @@
   align-items: stretch;
   align-content: flex-start;
   user-select: none;
-  position: absolute;
-  left: 0px;
-  right: 0px;
-  top: 0px;
-  bottom: 0px;
 }
 
 .game > div {
@@ -57,12 +57,20 @@
   order: 2;
 }
 
-// Move board left
 @media only screen and (min-width: 992px) {
+  .game {
+    position: absolute;
+    left: 0px;
+    right: 0px;
+    top: 0px;
+    bottom: 0px;
+  
+  }
+
+  // Move board left
   .game > cb-container {
     order: 1;
   }
-
   .game > div.desktop-flex-break {
     order: 1;
     display: block;
@@ -85,9 +93,14 @@
   outline: none;
   position: relative;
   overflow: hidden;
+  z-index: 1;
+
+  &:active {
+    background-color: transparent;
+  }
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .game button:hover {
     background-color: rgba(0, 0, 0, 0.05);
   }
@@ -103,6 +116,7 @@
   height: 100%;
   transform: scale(0);
   animation: ripple 300ms linear;
+  z-index: -1;
 }
 
 @keyframes ripple {
