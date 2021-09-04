@@ -8,13 +8,11 @@ pub trait UI {
 }
 
 fn make_moves(san_moves: &[&'_ str]) -> Vec<shakmaty::Move> {
-    log("make_moves called");
     let mut result = Vec::new();
     result.reserve_exact(san_moves.len());
 
     let mut pos = shakmaty::Chess::default();
     for m in san_moves {
-        log(m);
         let san: shakmaty::san::San = m.parse().unwrap();
         let m = san.to_move(&pos).unwrap();
 
@@ -25,14 +23,6 @@ fn make_moves(san_moves: &[&'_ str]) -> Vec<shakmaty::Move> {
     }
 
     result
-}
-
-#[wasm_bindgen::prelude::wasm_bindgen]
-extern "C" {
-    // Use `js_namespace` here to bind `console.log(..)` instead of just
-    // `log(..)`
-    #[wasm_bindgen::prelude::wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
 }
 
 struct MoveTreeNode<'source> {
@@ -151,7 +141,7 @@ pub async fn train(ui: impl UI) {
         ui.play_move(expected.clone(), Vec::new());
 
         if let Some(trainer_move) = iter.next() {
-            // TODO: Small timeout
+            crate::util::sleep(150).await;
             ui_trainer_move(trainer_move.clone(), iter.clone().next().cloned());
         } else {
             break;

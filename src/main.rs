@@ -93,7 +93,7 @@ impl Component for Game {
         }).into();
 
         let learning_ref = self.learning_input_ref.clone();
-        let on_learning_change = self.link.callback(move |e| {
+        let on_learning_change = self.link.callback(move |_| {
             if let Some(input) = learning_ref.cast::<web_sys::HtmlInputElement>() {
                 GameMessage::SetLearning(!input.checked())
             } else {
