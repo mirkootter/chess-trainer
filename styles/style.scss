@@ -98,6 +98,19 @@ body {
   &:active {
     background-color: transparent;
   }
+
+  &.disabled {
+    cursor: inherit;
+    filter: opacity(0.3);
+
+    &:hover {
+      background-color: transparent;
+    }
+
+    & .ripple {
+      display: none;
+    }
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {

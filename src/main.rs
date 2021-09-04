@@ -123,8 +123,8 @@ impl Component for Game {
                     reverse=true />
                 <div class="desktop-flex-break" />
                 <div class="game-footer">
-                    <components::iconbutton::IconButton image="images/icons/refresh_black_24dp.svg" />
-                    <components::iconbutton::IconButton image="images/icons/double_arrow_black_24dp.svg" />
+                    <components::iconbutton::IconButton disabled=false image="images/icons/refresh_black_24dp.svg" />
+                    <components::iconbutton::IconButton disabled=true image="images/icons/double_arrow_black_24dp.svg" />
                 </div>
             </div>
         }
