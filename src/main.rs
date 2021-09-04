@@ -7,7 +7,6 @@ mod util;
 enum GameMessage {
     PlayMove(shakmaty::Move, Vec<components::board::Arrow>),
     UpdateArrows(Vec<components::board::Arrow>),
-    RegisterMoveSender(async_oneshot::Sender<shakmaty::Move>),
     SetLearning(bool)
 }
 
@@ -18,17 +17,9 @@ struct Game {
     board_link_ref: components::board::LinkRef,
     board: std::rc::Rc<shakmaty::Chess>,
     arrows: Vec<components::board::Arrow>,
-    move_sender: Option<std::cell::RefCell<async_oneshot::Sender<shakmaty::Move>>>,
+    user_move_channel: util::EventChannel<shakmaty::Move>,
     learning_input_ref: yew::NodeRef,
     learning: bool
-}
-
-impl Game {
-    fn send_user_move_internal(&self, m: shakmaty::Move) {
-        if let Some(sender) = &self.move_sender {
-            let _ = sender.borrow_mut().send(m);
-        }
-    }
 }
 
 impl Component for Game {
@@ -41,7 +32,7 @@ impl Component for Game {
             board_link_ref: Default::default(),
             board: std::rc::Rc::new(shakmaty::Chess::default()),
             arrows: Vec::new(),
-            move_sender: None,
+            user_move_channel: util::EventChannel::new(),
             learning_input_ref: Default::default(),
             learning: true
         }
@@ -61,10 +52,6 @@ impl Component for Game {
             GameMessage::UpdateArrows(arrows) => {
                 self.arrows = arrows;
                 true
-            },
-            GameMessage::RegisterMoveSender(sender) => {
-                self.move_sender = Some(sender.into());
-                false
             },
             GameMessage::SetLearning(learning) => {
                 self.learning = learning;
@@ -90,13 +77,6 @@ impl Component for Game {
     }
 
     fn view(&self) -> Html {
-        let link = self.link.clone();
-        let on_user_move: yew::Callback<shakmaty::Move> = (move |m: shakmaty::Move| {
-            if let Some(game) = link.get_component() {
-                game.send_user_move_internal(m);
-            }
-        }).into();
-
         let learning_ref = self.learning_input_ref.clone();
         let on_learning_change = self.link.callback(move |_| {
             if let Some(input) = learning_ref.cast::<web_sys::HtmlInputElement>() {
@@ -118,7 +98,7 @@ impl Component for Game {
                 <components::board::Board
                     board=self.board.clone()
                     arrows=self.arrows.clone()
-                    on_user_move=on_user_move
+                    on_user_move=self.user_move_channel.callback()
                     link_ref=self.board_link_ref.clone()
                     reverse=true />
                 <div class="desktop-flex-break" />
@@ -154,9 +134,12 @@ impl trainer::UI for UI {
     }
 
     fn get_user_move(&self) -> util::DynFuture<shakmaty::Move> {
-        let (sender, receiver) = util::oneshot();
-        self.link.send_message(GameMessage::RegisterMoveSender(sender));
-        receiver
+        match self.link.get_component() {
+            Some(game) => {
+                game.user_move_channel.receive()
+            },
+            None => Box::pin(std::future::pending())
+        }
     }
 
     fn show_hints(&self) -> bool {

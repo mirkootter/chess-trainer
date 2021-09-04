@@ -68,3 +68,50 @@ pub fn sleep(time: u32) -> DynFuture<()> {
         }
     })
 }
+
+pub struct EventChannel<T> {
+    inner: std::rc::Rc<std::cell::RefCell<EventChannelInner<T>>>
+}
+
+struct EventChannelInner<T> {
+    senders: Vec<async_oneshot::Sender<T>>
+}
+
+impl<T: Clone> EventChannelInner<T> {
+    pub fn new() -> Self {
+        Self {
+            senders: Vec::new()
+        }
+    }
+
+    pub fn send(&mut self, value: T) {
+        for mut sender in self.senders.drain(..) {
+            let _ = sender.send(value.clone());
+        }
+    }
+}
+
+impl<T: Clone + 'static> EventChannel<T> {
+    pub fn new() -> Self {
+        Self {
+            inner: std::rc::Rc::new(std::cell::RefCell::new(EventChannelInner::new()))
+        }
+    }
+
+    pub fn _send(&self, value: T) {
+        self.inner.borrow_mut().send(value)
+    }
+
+    pub fn callback(&self) -> yew::Callback<T> {
+        let inner = self.inner.clone();
+        (move |value| {
+            inner.borrow_mut().send(value);
+        }).into()
+    }
+
+    pub fn receive(&self) -> DynFuture<T> {
+        let (sender, receiver) = oneshot();
+        self.inner.borrow_mut().senders.push(sender);
+        receiver
+    }
+}
