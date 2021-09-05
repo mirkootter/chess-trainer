@@ -115,3 +115,58 @@ impl<T: Clone + 'static> EventChannel<T> {
         receiver
     }
 }
+
+mod spawn {
+    pin_project_lite::pin_project! {
+        struct CancellableFuture<F> {
+            #[pin]
+            f: F,
+            cancelled: std::rc::Rc<std::cell::Cell<bool>>
+        }
+    }
+
+    impl<F: std::future::Future<Output=()>> std::future::Future for CancellableFuture<F> {
+        type Output = ();
+
+        fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<()> {
+            let this = self.project();
+            if this.cancelled.get() {
+                return std::task::Poll::Ready(())
+            }
+
+            this.f.poll(cx)
+        }
+    }
+
+    pub struct SpawnHandle(std::rc::Rc<std::cell::Cell<bool>>);
+
+    impl SpawnHandle {
+        pub fn new() -> Self {
+            SpawnHandle(Default::default())
+        }
+
+        pub fn cancel(self) {
+            drop(self);
+        }
+    }
+
+    impl Drop for SpawnHandle {
+        fn drop(&mut self) {
+            self.0.set(true);
+            // TODO: Wake the future if it wasn't cancelled before
+        }
+    }
+    
+    pub fn spawn_local_cancellable(f: impl std::future::Future<Output=()> + 'static) -> SpawnHandle {
+        let handle = SpawnHandle::new();
+        let f = CancellableFuture {
+            f,
+            cancelled: handle.0.clone()
+        };
+
+        wasm_bindgen_futures::spawn_local(f);
+        handle
+    }
+}
+
+pub use spawn::{SpawnHandle, spawn_local_cancellable};

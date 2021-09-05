@@ -100,9 +100,11 @@ name = "chess-trainer"
 version = "0.1.0"
 dependencies = [
  "async-oneshot",
+ "futures-micro",
  "getrandom",
  "gloo-console",
  "nom",
+ "pin-project-lite",
  "rand",
  "shakmaty",
  "wasm-bindgen",

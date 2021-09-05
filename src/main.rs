@@ -5,6 +5,7 @@ mod trainer;
 mod util;
 
 enum GameMessage {
+    Restart,
     PlayMove(shakmaty::Move, Vec<components::board::Arrow>),
     UpdateArrows(Vec<components::board::Arrow>),
     SetLearning(bool)
@@ -18,6 +19,8 @@ struct Game {
     board: std::rc::Rc<shakmaty::Chess>,
     arrows: Vec<components::board::Arrow>,
     user_move_channel: util::EventChannel<shakmaty::Move>,
+    restart_channel: util::EventChannel<()>,
+    next_level_channel: util::EventChannel<()>,
     learning_input_ref: yew::NodeRef,
     learning: bool
 }
@@ -33,6 +36,8 @@ impl Component for Game {
             board: std::rc::Rc::new(shakmaty::Chess::default()),
             arrows: Vec::new(),
             user_move_channel: util::EventChannel::new(),
+            restart_channel: util::EventChannel::new(),
+            next_level_channel: util::EventChannel::new(),
             learning_input_ref: Default::default(),
             learning: true
         }
@@ -40,6 +45,11 @@ impl Component for Game {
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
+            GameMessage::Restart => {
+                self.board = Default::default();
+                self.arrows = Vec::new();
+                true
+            },
             GameMessage::PlayMove(m, arrows) => {
                 use shakmaty::Position;
                 let mut board = (*self.board).clone();
@@ -103,20 +113,31 @@ impl Component for Game {
                     reverse=true />
                 <div class="desktop-flex-break" />
                 <div class="game-footer">
-                    <components::iconbutton::IconButton disabled=false image="images/icons/refresh_black_24dp.svg" />
-                    <components::iconbutton::IconButton disabled=true image="images/icons/double_arrow_black_24dp.svg" />
+                    <components::iconbutton::IconButton
+                        disabled=false
+                        image="images/icons/refresh_black_24dp.svg"
+                        onclick=self.restart_channel.callback() />
+                    <components::iconbutton::IconButton
+                        disabled=false
+                        image="images/icons/double_arrow_black_24dp.svg"
+                        onclick=self.next_level_channel.callback() />
                 </div>
             </div>
         }
     }
 }
 
+#[derive(Clone)]
 struct UI {
     link: ComponentLink<Game>,
     board_link_ref: components::board::LinkRef
 }
 
 impl trainer::UI for UI {
+    fn restart(&self) {
+        self.link.send_message(GameMessage::Restart);
+    }
+
     fn play_move(&self, m: shakmaty::Move, arrows: Vec<components::board::Arrow>) {
         self.link.send_message(GameMessage::PlayMove(m, arrows));
     }
@@ -137,6 +158,24 @@ impl trainer::UI for UI {
         match self.link.get_component() {
             Some(game) => {
                 game.user_move_channel.receive()
+            },
+            None => Box::pin(std::future::pending())
+        }
+    }
+
+    fn wait_for_restart(&self) -> util::DynFuture<()> {
+        match self.link.get_component() {
+            Some(game) => {
+                game.restart_channel.receive()
+            },
+            None => Box::pin(std::future::pending())
+        }
+    }
+
+    fn wait_for_next_level(&self) -> util::DynFuture<()> {
+        match self.link.get_component() {
+            Some(game) => {
+                game.next_level_channel.receive()
             },
             None => Box::pin(std::future::pending())
         }
