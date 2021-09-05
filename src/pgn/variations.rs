@@ -1,4 +1,4 @@
-pub fn make_moves(san_moves: &[&'_ str]) -> Vec<shakmaty::Move> {
+fn make_moves(san_moves: &[&'_ str]) -> Vec<shakmaty::Move> {
     let mut result = Vec::new();
     result.reserve_exact(san_moves.len());
 
@@ -16,7 +16,7 @@ pub fn make_moves(san_moves: &[&'_ str]) -> Vec<shakmaty::Move> {
     result
 }
 
-pub struct Node<'source> {
+struct Node<'source> {
     parent: Option<std::rc::Rc<Self>>,
     moves: Vec<&'source str>
 }
@@ -89,5 +89,20 @@ impl<'source> Node<'source> {
 
         root.parse_internal(&mut iter, &mut result);
         result
+    }
+}
+
+pub struct Variations<'source>(Vec<Node<'source>>);
+
+impl<'source> Variations<'source> {
+    pub fn parse(pgn: &'source str) -> Self {
+        Variations(Node::parse(pgn))
+    }
+
+    pub fn choose(&self, rng: &mut impl rand::Rng) -> Vec<shakmaty::Move> {
+        use rand::seq::SliceRandom;
+        let variation = self.0.choose(rng).unwrap();
+
+        make_moves(&variation.resolve())
     }
 }

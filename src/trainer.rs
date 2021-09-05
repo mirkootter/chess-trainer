@@ -13,7 +13,7 @@ pub trait UI: Clone {
 
 pub async fn train(ui: impl UI + 'static) {
     let pgn = include_str!("../data/stafford.pgn");
-    let variants = crate::pgn::movetree::Node::parse(pgn);
+    let variations = crate::pgn::variations::Variations::parse(pgn);
 
     enum UserAction { Restart, NextLevel }
 
@@ -32,36 +32,27 @@ pub async fn train(ui: impl UI + 'static) {
     };
 
     let mut random = rand::thread_rng();
+    let mut moves = variations.choose(&mut random);
 
     loop {
-        let moves = {
-            use rand::seq::SliceRandom;
-            let variant = variants.choose(&mut random).unwrap();
-            crate::pgn::movetree::make_moves(&variant.resolve())
-        };
+        let training = train_moves(ui.clone(), moves.clone());
+        let training = crate::util::spawn_local_cancellable(training);
 
-        loop {
-            let training = train_moves(ui.clone(), moves.clone());
-            let training = crate::util::spawn_local_cancellable(training);
-    
-            match wait_for_user_action().await {
-                UserAction::NextLevel => { break; },
-                UserAction::Restart => { }
-            }
-    
-            training.cancel();
+        match wait_for_user_action().await {
+            UserAction::NextLevel => { moves = variations.choose(&mut random); },
+            UserAction::Restart => { }
         }
+
+        training.cancel();
     }
 }
 
 pub async fn train_moves(ui: impl UI, moves: Vec<shakmaty::Move>) {
     let ui_trainer_move = |m: shakmaty::Move, hint: Option<shakmaty::Move>| {
-        use crate::components::board::Arrow;
-
-        let mut arrows = vec![Arrow(m.from().unwrap(), m.to())];
+        let mut arrows = vec![(&m).into()];
         if let Some(hint) = hint {
             if ui.show_hints() {
-                arrows.push(Arrow(hint.from().unwrap(), hint.to()));
+                arrows.push((&hint).into());
             }
         }
         ui.play_move(m, arrows);
@@ -88,9 +79,7 @@ pub async fn train_moves(ui: impl UI, moves: Vec<shakmaty::Move>) {
                 if errors == 3 {
                     // wait a small delay for the shake to end
                     crate::util::sleep(300).await;
-
-                    use crate::components::board::Arrow;
-                    ui.update_arrows(vec![Arrow(expected.from().unwrap(), expected.to())]);
+                    ui.update_arrows(vec![expected.into()]);
                 }
             }
         }

@@ -3,6 +3,12 @@ pub type LinkRef = std::rc::Rc<std::cell::RefCell<Option<yew::ComponentLink<Boar
 #[derive(Clone)]
 pub struct Arrow(pub shakmaty::Square, pub shakmaty::Square);
 
+impl From<&shakmaty::Move> for Arrow {
+    fn from(m: &shakmaty::Move) -> Self {
+        Arrow(m.from().unwrap(), m.to())
+    }
+}
+
 #[derive(yew::Properties, Clone)]
 pub struct BoardProps {
     pub link_ref: LinkRef,
