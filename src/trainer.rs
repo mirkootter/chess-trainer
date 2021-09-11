@@ -12,8 +12,10 @@ pub trait UI: Clone {
 }
 
 pub async fn train(ui: impl UI + 'static) {
-    let pgn = include_str!("../data/stafford.pgn");
-    let variations = crate::pgn::variations::Variations::parse(pgn);
+    let mut movetree = crate::pgn::movetree::MoveTree::new();
+    movetree.add_pgn(include_str!("../data/stafford.pgn"));
+    //movetree.add_pgn(include_str!("../data/kid.pgn"));
+    let variations = movetree.get_all_variations();
 
     enum UserAction { Restart, NextLevel }
 

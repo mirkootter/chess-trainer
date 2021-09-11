@@ -18,3 +18,4 @@ web-sys = "0.3.53"
 yew = "0.18"
 rand = "0.8.4"
 getrandom = { version="0.2.3", features=["js"] }
+qcell = "0.4.2"

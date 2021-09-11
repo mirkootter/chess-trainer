@@ -105,6 +105,7 @@ dependencies = [
  "gloo-console",
  "nom",
  "pin-project-lite",
+ "qcell",
  "rand",
  "shakmaty",
  "wasm-bindgen",
@@ -313,6 +314,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "once_cell"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "692fcb63b64b1758029e0a96ee63e049ce8c5948587f2f7208df04625e5f6b56"
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -331,6 +338,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c7ed8b8c7b886ea3ed7dde405212185f423ab44682667c8c6dd14aa1d9f6612"
 dependencies = [
  "unicode-xid",
+]
+
+[[package]]
+name = "qcell"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a30d13d440673c6c73ecf8af12b60a53e106517a97b06ec64b3a26bd08c8ac5c"
+dependencies = [
+ "once_cell",
 ]
 
 [[package]]
