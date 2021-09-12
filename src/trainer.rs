@@ -64,36 +64,49 @@ pub async fn train_moves(ui: impl UI, variation: crate::pgn::movetree::Variation
     ui.restart();
 
     let mut iter = variation.iter();
-    if let Some(trainer_move) = iter.next() {
-        crate::util::sleep(150).await;
-        ui_trainer_move(trainer_move, iter.peek());
-    }
 
-    while let Some(expected) = iter.next() {
-        let mut errors = 0;
-        loop {
-            let user_move = ui.get_user_move().await;
-            if user_move == expected {
-                break;
-            } else {
-                ui.shake();
-                errors = errors + 1;
+    let mut current_player = Player::Trainer; // Trainer plays white and makes the first move
 
-                if errors == 3 {
-                    // wait a small delay for the shake to end
-                    crate::util::sleep(300).await;
-                    ui.update_arrows(vec![(&expected).into()]);
+    while let Some(expected_move) = iter.next() {
+        match current_player {
+            Player::Trainer => {
+                crate::util::sleep(150).await;
+                ui_trainer_move(expected_move, iter.peek());
+            },
+            Player::Student => {
+                let mut errors = 0;
+                loop {
+                    let user_move = ui.get_user_move().await;
+                    if user_move == expected_move {
+                        break;
+                    } else {
+                        ui.shake();
+                        errors = errors + 1;
+        
+                        if errors == 3 {
+                            // wait a small delay for the shake to end
+                            crate::util::sleep(300).await;
+                            ui.update_arrows(vec![(&expected_move).into()]);
+                        }
+                    }
                 }
+        
+                ui.play_move(expected_move, Vec::new());
             }
         }
 
-        ui.play_move(expected.clone(), Vec::new());
+        current_player = current_player.next();
+    }
+}
 
-        if let Some(trainer_move) = iter.next() {
-            crate::util::sleep(150).await;
-            ui_trainer_move(trainer_move.clone(), iter.peek());
-        } else {
-            break;
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Player { Student, Trainer }
+
+impl Player {
+    fn next(self) -> Self {
+        match self {
+            Self::Student => Self::Trainer,
+            Self::Trainer => Self::Student
         }
     }
 }
