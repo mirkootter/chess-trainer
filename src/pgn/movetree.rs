@@ -7,14 +7,15 @@ type Tree<'source> = tree::Tree<&'source str>;
 
 pub struct MoveTree<'source>(Tree<'source>);
 
-pub struct Variation<'source, 'tree> {
-    tree: &'tree MoveTree<'source>,
+#[derive(Clone)]
+pub struct Variation<'source> {
+    tree: Rc<MoveTree<'source>>,
     nodes: Vec<Rc<Node<'source>>>
 }
 
 
-pub struct Variations<'source, 'tree> {
-    tree: &'tree MoveTree<'source>,
+pub struct Variations<'source> {
+    tree: Rc<MoveTree<'source>>,
     variations: Vec<Rc<Node<'source>>>
 }
 
@@ -56,7 +57,7 @@ impl<'source> MoveTree<'source> {
         }
     }
 
-    pub fn get_all_variations<'tree>(&'tree self) -> Variations<'source, 'tree> {
+    pub fn get_all_variations(self: Rc<Self>) -> Variations<'source> {
         let mut variations = Vec::new();
         self.get_all_variations_from_node(&self.0.root, &mut variations);
 
@@ -86,8 +87,8 @@ impl<'source> MoveTree<'source> {
     }
 }
 
-impl<'source, 'tree> Variation<'source, 'tree> {
-    fn new(tree: &'tree MoveTree<'source>, target_node: Rc<Node<'source>>) -> Self {
+impl<'source> Variation<'source> {
+    fn new(tree: Rc<MoveTree<'source>>, target_node: Rc<Node<'source>>) -> Self {
         let count = {
             let mut count = 0;
             let mut node = target_node.clone();
@@ -124,10 +125,10 @@ impl<'source, 'tree> Variation<'source, 'tree> {
     }
 }
 
-impl<'source, 'tree> Variations<'source, 'tree> {
-    pub fn choose(&self, rng: &mut impl rand::Rng) -> Variation<'source, 'tree> {
+impl<'source> Variations<'source> {
+    pub fn choose(&self, rng: &mut impl rand::Rng) -> Variation<'source> {
         use rand::seq::SliceRandom;
-        Variation::new(self.tree, self.variations.choose(rng).unwrap().clone())
+        Variation::new(self.tree.clone(), self.variations.choose(rng).unwrap().clone())
     }
 
     #[inline]
@@ -135,13 +136,13 @@ impl<'source, 'tree> Variations<'source, 'tree> {
         self.variations.len()
     }
 
-    pub fn get(&self, index: usize) -> Variation<'source, 'tree> {
-        Variation::new(self.tree, self.variations[index].clone())
+    pub fn get(&self, index: usize) -> Variation<'source> {
+        Variation::new(self.tree.clone(), self.variations[index].clone())
     }
 }
 
 pub struct VariationIterator<'source, 'a> {
-    variation: &'a Variation<'source, 'a>,
+    variation: &'a Variation<'source>,
     node_iter: std::slice::Iter<'a, Rc<Node<'source>>>,
     pos: shakmaty::Chess
 }
@@ -166,6 +167,21 @@ impl<'source, 'a> Iterator for VariationIterator<'source, 'a> {
     }
 }
 
+impl<'source, 'a> VariationIterator<'source, 'a> {
+    pub fn peek(&self) -> Option<shakmaty::Move> {
+        match self.node_iter.clone().next() {
+            None => None,
+            Some(node) => {
+                let m = node.value(&self.variation.tree.0).unwrap();
+                let san: shakmaty::san::San = m.parse().unwrap();
+                let m = san.to_move(&self.pos).unwrap();
+
+                Some(m)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -173,14 +189,18 @@ mod tests {
         let mut tree = super::MoveTree::new();
         tree.add_pgn("e4 e5 Nf3");
         {
+            let tree = std::rc::Rc::new(tree);
             let variations = tree.get_all_variations();
             assert_eq!(variations.len(), 1);
 
             assert_eq!(variations.get(0).resolve(), ["e4", "e5", "Nf3"]);
         }
 
+        let mut tree = super::MoveTree::new();
+        tree.add_pgn("e4 e5 Nf3");
         tree.add_pgn("e4 e5 Nc3 Nf6");
         {
+            let tree = std::rc::Rc::new(tree);
             let variations = tree.get_all_variations();
             assert_eq!(variations.len(), 2);
 
@@ -188,8 +208,12 @@ mod tests {
             assert_eq!(variations.get(1).resolve(), ["e4", "e5", "Nc3", "Nf6"]);
         }
 
+        let mut tree = super::MoveTree::new();
+        tree.add_pgn("e4 e5 Nf3");
+        tree.add_pgn("e4 e5 Nc3 Nf6");
         tree.add_pgn("e4 e5 Nf3 Nf6 Nxe5");
         {
+            let tree = std::rc::Rc::new(tree);
             let variations = tree.get_all_variations();
             assert_eq!(variations.len(), 2);
 
@@ -197,8 +221,13 @@ mod tests {
             assert_eq!(variations.get(1).resolve(), ["e4", "e5", "Nc3", "Nf6"]);
         }
 
+        let mut tree = super::MoveTree::new();
+        tree.add_pgn("e4 e5 Nf3");
+        tree.add_pgn("e4 e5 Nc3 Nf6");
+        tree.add_pgn("e4 e5 Nf3 Nf6 Nxe5");
         tree.add_pgn("d4 d5 c4");
         {
+            let tree = std::rc::Rc::new(tree);
             let variations = tree.get_all_variations();
             assert_eq!(variations.len(), 3);
 
@@ -213,6 +242,7 @@ mod tests {
         let mut tree = super::MoveTree::new();
         tree.add_pgn("e4 (d4 d5 c4) e5 Nf3 (Nc3 Nf6) Nf6 Nxe5");
         {
+            let tree = std::rc::Rc::new(tree);
             let variations = tree.get_all_variations();
             assert_eq!(variations.len(), 3);
 

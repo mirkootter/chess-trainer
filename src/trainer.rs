@@ -15,7 +15,8 @@ pub async fn train(ui: impl UI + 'static) {
     let mut movetree = crate::pgn::movetree::MoveTree::new();
     movetree.add_pgn(include_str!("../data/stafford.pgn"));
     //movetree.add_pgn(include_str!("../data/kid.pgn"));
-    let variations = movetree.get_all_variations();
+
+    let variations = std::rc::Rc::new(movetree).get_all_variations();
 
     enum UserAction { Restart, NextLevel }
 
@@ -34,14 +35,14 @@ pub async fn train(ui: impl UI + 'static) {
     };
 
     let mut random = rand::thread_rng();
-    let mut moves: Vec<shakmaty::Move> = variations.choose(&mut random).iter().collect();
+    let mut variation = variations.choose(&mut random);
 
     loop {
-        let training = train_moves(ui.clone(), moves.clone());
+        let training = train_moves(ui.clone(), variation.clone());
         let training = crate::util::spawn_local_cancellable(training);
 
         match wait_for_user_action().await {
-            UserAction::NextLevel => { moves = variations.choose(&mut random).iter().collect(); },
+            UserAction::NextLevel => { variation = variations.choose(&mut random); },
             UserAction::Restart => { }
         }
 
@@ -49,7 +50,7 @@ pub async fn train(ui: impl UI + 'static) {
     }
 }
 
-pub async fn train_moves(ui: impl UI, moves: Vec<shakmaty::Move>) {
+pub async fn train_moves(ui: impl UI, variation: crate::pgn::movetree::Variation<'static>) {
     let ui_trainer_move = |m: shakmaty::Move, hint: Option<shakmaty::Move>| {
         let mut arrows = vec![(&m).into()];
         if let Some(hint) = hint {
@@ -62,17 +63,17 @@ pub async fn train_moves(ui: impl UI, moves: Vec<shakmaty::Move>) {
 
     ui.restart();
 
-    let mut iter = moves.iter();
+    let mut iter = variation.iter();
     if let Some(trainer_move) = iter.next() {
         crate::util::sleep(150).await;
-        ui_trainer_move(trainer_move.clone(), iter.clone().next().cloned());
+        ui_trainer_move(trainer_move, iter.peek());
     }
 
     while let Some(expected) = iter.next() {
         let mut errors = 0;
         loop {
             let user_move = ui.get_user_move().await;
-            if &user_move == expected {
+            if user_move == expected {
                 break;
             } else {
                 ui.shake();
@@ -81,7 +82,7 @@ pub async fn train_moves(ui: impl UI, moves: Vec<shakmaty::Move>) {
                 if errors == 3 {
                     // wait a small delay for the shake to end
                     crate::util::sleep(300).await;
-                    ui.update_arrows(vec![expected.into()]);
+                    ui.update_arrows(vec![(&expected).into()]);
                 }
             }
         }
@@ -90,7 +91,7 @@ pub async fn train_moves(ui: impl UI, moves: Vec<shakmaty::Move>) {
 
         if let Some(trainer_move) = iter.next() {
             crate::util::sleep(150).await;
-            ui_trainer_move(trainer_move.clone(), iter.clone().next().cloned());
+            ui_trainer_move(trainer_move.clone(), iter.peek());
         } else {
             break;
         }
