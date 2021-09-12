@@ -6,41 +6,70 @@ pub trait UI: Clone {
     fn update_arrows(&self, arrows: Vec<crate::components::board::Arrow>);
     fn shake(&self);
     fn get_user_move(&self) -> DynFuture<shakmaty::Move>;
-    fn wait_for_restart(&self) -> DynFuture<()>;
-    fn wait_for_next_level(&self) -> DynFuture<()>;
+    fn wait_for_user_action(&self) -> DynFuture<UserAction>;
     fn show_hints(&self) -> bool;
 }
 
 #[derive(Clone)]
-struct SharedGame(std::rc::Rc<std::cell::RefCell<crate::pgn::movetree::VariationIterator<'static>>>);
+pub enum UserAction {
+    Restart,
+    NextLevel
+}
+
+#[derive(Clone)]
+struct SharedGame(std::rc::Rc<std::cell::RefCell<GameInner>>);
+
+struct GameInner {
+    iter: crate::pgn::movetree::VariationIterator<'static>,
+    last_turn: Player
+}
+
+impl GameInner {
+    fn new(variation: &crate::pgn::movetree::Variation<'static>) -> Self {
+        GameInner {
+            iter: variation.iter(),
+            last_turn: Player::Student // We want to the trainer to play
+        }
+    }
+}
 
 impl SharedGame {
     pub fn new(variation: &crate::pgn::movetree::Variation<'static>) -> Self {
-        SharedGame(std::rc::Rc::new(variation.iter().into()))
+        SharedGame(std::cell::RefCell::new(GameInner::new(variation)).into())
+    }
+
+    pub fn current_player(&self) -> Player {
+        self.0.borrow().last_turn
     }
 
     pub fn reset(&self) {
-        self.0.borrow_mut().reset();
+        let mut inner = self.0.borrow_mut();
+        inner.iter.reset();
+        inner.last_turn = Player::Student;
     }
 
     pub fn start_variation(&self, variation: &crate::pgn::movetree::Variation<'static>) {
-        *self.0.borrow_mut() = variation.iter();
+        let mut inner = self.0.borrow_mut();
+        inner.iter = variation.iter();
+        inner.last_turn = Player::Student;
     }
 
     pub fn next(&self) -> Option<shakmaty::Move> {
-        self.0.borrow_mut().next()
+        let mut inner = self.0.borrow_mut();
+        inner.last_turn = inner.last_turn.next();
+        inner.iter.next()
     }
 
     pub fn peek(&self) -> Option<shakmaty::Move> {
-        self.0.borrow().peek()
+        self.0.borrow().iter.peek()
     }
 
     pub fn peek_all(&self) -> Vec<shakmaty::Move> {
-        self.0.borrow().peek_all()
+        self.0.borrow().iter.peek_all()
     }
 
     pub fn try_switch(&self, m: &shakmaty::Move) -> bool {
-        self.0.borrow_mut().try_switch(m)
+        self.0.borrow_mut().iter.try_switch(m)
     }
 }
 
@@ -51,22 +80,6 @@ pub async fn train(ui: impl UI + 'static) {
 
     let variations = std::rc::Rc::new(movetree).get_all_variations();
 
-    enum UserAction { Restart, NextLevel }
-
-    let wait_for_user_action = || {
-        let wait_for_restart = async {
-            ui.wait_for_restart().await;
-            UserAction::Restart
-        };
-
-        let wait_for_next_level = async {
-            ui.wait_for_next_level().await;
-            UserAction::NextLevel
-        };
-
-        futures_micro::or!(wait_for_restart, wait_for_next_level)
-    };
-
     let mut random = rand::thread_rng();
     let game = SharedGame::new(&variations.choose(&mut random));
 
@@ -74,7 +87,7 @@ pub async fn train(ui: impl UI + 'static) {
         let training = train_moves(ui.clone(), game.clone());
         let training = crate::util::spawn_local_cancellable(training);
 
-        match wait_for_user_action().await {
+        match ui.wait_for_user_action().await {
             UserAction::NextLevel => { game.start_variation(&variations.choose(&mut random)); },
             UserAction::Restart => { game.reset(); }
         }
@@ -97,8 +110,6 @@ async fn train_moves(ui: impl UI, game: SharedGame) {
     };
 
     ui.restart();
-
-    let mut current_player = Player::Trainer; // Trainer plays white and makes the first move
 
     loop {
         if explore {
@@ -123,7 +134,7 @@ async fn train_moves(ui: impl UI, game: SharedGame) {
                 None => break
             };
 
-            match current_player {
+            match game.current_player() {
                 Player::Trainer => {
                     crate::util::sleep(150).await;
                     ui_trainer_move(expected_move, game.peek());
@@ -150,8 +161,6 @@ async fn train_moves(ui: impl UI, game: SharedGame) {
                 }
             }
         }
-
-        current_player = current_player.next();
     }
 }
 

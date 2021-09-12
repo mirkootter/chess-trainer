@@ -19,8 +19,7 @@ struct Game {
     board: std::rc::Rc<shakmaty::Chess>,
     arrows: Vec<components::board::Arrow>,
     user_move_channel: util::EventChannel<shakmaty::Move>,
-    restart_channel: util::EventChannel<()>,
-    next_level_channel: util::EventChannel<()>,
+    user_action_channel: util::EventChannel<trainer::UserAction>,
     learning_input_ref: yew::NodeRef,
     learning: bool
 }
@@ -36,8 +35,7 @@ impl Component for Game {
             board: std::rc::Rc::new(shakmaty::Chess::default()),
             arrows: Vec::new(),
             user_move_channel: util::EventChannel::new(),
-            restart_channel: util::EventChannel::new(),
-            next_level_channel: util::EventChannel::new(),
+            user_action_channel: util::EventChannel::new(),
             learning_input_ref: Default::default(),
             learning: true
         }
@@ -116,11 +114,11 @@ impl Component for Game {
                     <components::iconbutton::IconButton
                         disabled=false
                         image="images/icons/refresh_black_24dp.svg"
-                        onclick=self.restart_channel.callback() />
+                        onclick=self.user_action_channel.callback_constant(trainer::UserAction::Restart) />
                     <components::iconbutton::IconButton
                         disabled=false
                         image="images/icons/double_arrow_black_24dp.svg"
-                        onclick=self.next_level_channel.callback() />
+                        onclick=self.user_action_channel.callback_constant(trainer::UserAction::NextLevel) />
                 </div>
             </div>
         }
@@ -163,19 +161,10 @@ impl trainer::UI for UI {
         }
     }
 
-    fn wait_for_restart(&self) -> util::DynFuture<()> {
+    fn wait_for_user_action(&self) -> util::DynFuture<trainer::UserAction> {
         match self.link.get_component() {
             Some(game) => {
-                game.restart_channel.receive()
-            },
-            None => Box::pin(std::future::pending())
-        }
-    }
-
-    fn wait_for_next_level(&self) -> util::DynFuture<()> {
-        match self.link.get_component() {
-            Some(game) => {
-                game.next_level_channel.receive()
+                game.user_action_channel.receive()
             },
             None => Box::pin(std::future::pending())
         }

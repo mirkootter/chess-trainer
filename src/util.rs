@@ -109,6 +109,13 @@ impl<T: Clone + 'static> EventChannel<T> {
         }).into()
     }
 
+    pub fn callback_constant<EventType>(&self, value: T) -> yew::Callback<EventType> {
+        let inner = self.inner.clone();
+        (move |_| {
+            inner.borrow_mut().send(value.clone());
+        }).into()
+    }
+
     pub fn receive(&self) -> DynFuture<T> {
         let (sender, receiver) = oneshot();
         self.inner.borrow_mut().senders.push(sender);
