@@ -205,6 +205,30 @@ impl<'source> VariationIterator<'source> {
         self.index  = 0;
         self.pos = Default::default();
     }
+
+    fn try_switch_internal(&mut self, m: &shakmaty::Move) -> Option<()> {
+        let node = self.nodes.get(self.index)?;
+        let parent = node.try_get_parent(&self.tree.0).unwrap();
+
+        for child in parent.get_children(&self.tree.0) {
+            let found_move = child.value(&self.tree.0).unwrap();
+            let san: shakmaty::san::San = found_move.parse().unwrap();
+            let found_move = san.to_move(&self.pos).unwrap();
+
+            if &found_move == m {
+                let node = child.find_first_leaf(&self.tree.0);
+                let variation = Variation::new(self.tree.clone(), node.clone());
+                self.nodes = variation.resolve_nodes();
+                return Some(());
+            }
+        }
+        
+        None
+    }
+
+    pub fn try_switch(&mut self, m: &shakmaty::Move) -> bool {
+        self.try_switch_internal(m).is_some()
+    }
 }
 
 #[cfg(test)]

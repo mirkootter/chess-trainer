@@ -38,6 +38,10 @@ impl SharedGame {
     pub fn peek_all(&self) -> Vec<shakmaty::Move> {
         self.0.borrow().peek_all()
     }
+
+    pub fn try_switch(&self, m: &shakmaty::Move) -> bool {
+        self.0.borrow_mut().try_switch(m)
+    }
 }
 
 pub async fn train(ui: impl UI + 'static) {
@@ -100,10 +104,16 @@ async fn train_moves(ui: impl UI, game: SharedGame) {
         if explore {
             let arrows = game.peek_all().iter().map::<crate::components::board::Arrow, _>(|m| m.into()).collect();
             ui.update_arrows(arrows);
-            let user_move = ui.get_user_move().await;
 
-            // TODO: Obviously we should not ignore the user's move choice
-            // TODO: Only show the errors if hints are on or for trainer moves
+            loop {
+                let user_move = ui.get_user_move().await;
+                if game.try_switch(&user_move) {
+                    break;
+                } else {
+                    ui.shake();
+                }
+            }
+
             if let Some(next_move) = game.next() {
                 ui.play_move(next_move, Vec::new());
             }

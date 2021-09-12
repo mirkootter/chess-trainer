@@ -81,6 +81,17 @@ impl<T> Node<T> {
     pub fn get_children<'a>(&'a self, tree: &'a Tree<T>) -> &'a Vec<Rc<Self>> {
         &self.inner.ro(&tree.owner).children
     }
+
+    pub fn find_first_leaf<'a>(self: &'a Rc<Self>, tree: &'a Tree<T>) -> &'a Rc<Self> {
+        let mut node = self;
+        loop {
+            let inner = node.inner.ro(&tree.owner);
+            match inner.children.first() {
+                None => return node,
+                Some(child) => { node = child; }
+            }
+        }
+    }
 }
 
 impl<T: PartialEq> Node<T> {
