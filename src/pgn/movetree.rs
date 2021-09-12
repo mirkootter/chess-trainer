@@ -168,6 +168,7 @@ impl<'source, 'a> Iterator for VariationIterator<'source, 'a> {
 }
 
 impl<'source, 'a> VariationIterator<'source, 'a> {
+    /// Gets the next move in the current variation, if any
     pub fn peek(&self) -> Option<shakmaty::Move> {
         match self.node_iter.clone().next() {
             None => None,
@@ -177,6 +178,21 @@ impl<'source, 'a> VariationIterator<'source, 'a> {
                 let m = san.to_move(&self.pos).unwrap();
 
                 Some(m)
+            }
+        }
+    }
+
+    /// Gets all moves from the current position by looking at all variations, not just this one
+    pub fn peek_all(&self) -> Vec<shakmaty::Move> {
+        match self.node_iter.clone().next() {
+            None => Vec::new(),
+            Some(node) => {
+                let parent = node.try_get_parent(&self.variation.tree.0).unwrap();
+                parent.get_children(&self.variation.tree.0).iter().map(|node| {
+                    let m = node.value(&self.variation.tree.0).unwrap();
+                    let san: shakmaty::san::San = m.parse().unwrap();
+                    san.to_move(&self.pos).unwrap()
+                }).collect()
             }
         }
     }

@@ -51,6 +51,8 @@ pub async fn train(ui: impl UI + 'static) {
 }
 
 pub async fn train_moves(ui: impl UI, variation: crate::pgn::movetree::Variation<'static>) {
+    let explore = false; // TODO
+
     let ui_trainer_move = |m: shakmaty::Move, hint: Option<shakmaty::Move>| {
         let mut arrows = vec![(&m).into()];
         if let Some(hint) = hint {
@@ -67,31 +69,48 @@ pub async fn train_moves(ui: impl UI, variation: crate::pgn::movetree::Variation
 
     let mut current_player = Player::Trainer; // Trainer plays white and makes the first move
 
-    while let Some(expected_move) = iter.next() {
-        match current_player {
-            Player::Trainer => {
-                crate::util::sleep(150).await;
-                ui_trainer_move(expected_move, iter.peek());
-            },
-            Player::Student => {
-                let mut errors = 0;
-                loop {
-                    let user_move = ui.get_user_move().await;
-                    if user_move == expected_move {
-                        break;
-                    } else {
-                        ui.shake();
-                        errors = errors + 1;
-        
-                        if errors == 3 {
-                            // wait a small delay for the shake to end
-                            crate::util::sleep(300).await;
-                            ui.update_arrows(vec![(&expected_move).into()]);
+    loop {
+        if explore {
+            let arrows = iter.peek_all().iter().map::<crate::components::board::Arrow, _>(|m| m.into()).collect();
+            ui.update_arrows(arrows);
+            let user_move = ui.get_user_move().await;
+
+            // TODO: Obviously we should not ignore the user's move choice
+            // TODO: Only show the errors if hints are on or for trainer moves
+            if let Some(next_move) = iter.next() {
+                ui.play_move(next_move, Vec::new());
+            }
+        } else {
+            let expected_move = match iter.next() {
+                Some(m) => m,
+                None => break
+            };
+
+            match current_player {
+                Player::Trainer => {
+                    crate::util::sleep(150).await;
+                    ui_trainer_move(expected_move, iter.peek());
+                },
+                Player::Student => {
+                    let mut errors = 0;
+                    loop {
+                        let user_move = ui.get_user_move().await;
+                        if user_move == expected_move {
+                            break;
+                        } else {
+                            ui.shake();
+                            errors = errors + 1;
+            
+                            if errors == 3 {
+                                // wait a small delay for the shake to end
+                                crate::util::sleep(300).await;
+                                ui.update_arrows(vec![(&expected_move).into()]);
+                            }
                         }
                     }
+            
+                    ui.play_move(expected_move, Vec::new());
                 }
-        
-                ui.play_move(expected_move, Vec::new());
             }
         }
 
