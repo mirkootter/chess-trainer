@@ -6,12 +6,16 @@ type Node<'source> = tree::Node<&'source str>;
 type Tree<'source> = tree::Tree<&'source str>;
 
 pub struct MoveTree<'source>(Tree<'source>);
-pub struct Variation<'source>(Rc<Node<'source>>);
+
+pub struct Variation<'source, 'tree> {
+    tree: &'tree MoveTree<'source>,
+    node: Rc<Node<'source>>
+}
 
 
 pub struct Variations<'source, 'tree> {
     tree: &'tree MoveTree<'source>,
-    variations: Vec<Variation<'source>>
+    variations: Vec<Rc<Node<'source>>>
 }
 
 impl<'source> MoveTree<'source> {
@@ -62,10 +66,10 @@ impl<'source> MoveTree<'source> {
         }
     }
 
-    fn get_all_variations_from_node(&self, node: &Rc<Node<'source>>, result: &mut Vec<Variation<'source>>) {
+    fn get_all_variations_from_node(&self, node: &Rc<Node<'source>>, result: &mut Vec<Rc<Node<'source>>>) {
         let children = node.get_children(&self.0);
         if children.is_empty() {
-            result.push(Variation(node.clone()));
+            result.push(node.clone());
             return;
 
         }
@@ -82,13 +86,13 @@ impl<'source> MoveTree<'source> {
     }
 }
 
-impl<'source> Variation<'source> {
-    pub fn resolve(&self, tree: &MoveTree<'source>) -> Vec<&'source str> {
+impl<'source, 'tree> Variation<'source, 'tree> {
+    pub fn resolve(&self) -> Vec<&'source str> {
         let count = {
             let mut count = 0;
-            let mut node = self.0.clone();
+            let mut node = self.node.clone();
 
-            while let Some(parent) = node.try_get_parent(&tree.0) {
+            while let Some(parent) = node.try_get_parent(&self.tree.0) {
                 count = count + 1;
                 node = parent;
             }
@@ -99,13 +103,13 @@ impl<'source> Variation<'source> {
         let mut result = Vec::new();
         result.reserve_exact(count);
 
-        tree.resolve_variation_internal(&self.0, &mut result);
+        self.tree.resolve_variation_internal(&self.node, &mut result);
 
         result
     }
 
-    pub fn make_moves(&self, tree: &MoveTree<'source>) -> Vec<shakmaty::Move> {
-        let moves = self.resolve(tree);
+    pub fn make_moves(&self) -> Vec<shakmaty::Move> {
+        let moves = self.resolve();
         let mut result = Vec::new();
         result.reserve_exact(moves.len());
 
@@ -124,12 +128,25 @@ impl<'source> Variation<'source> {
     }
 }
 
-impl<'source> Variations<'source, '_> {
-    pub fn choose(&self, rng: &mut impl rand::Rng) -> Vec<shakmaty::Move> {
+impl<'source, 'tree> Variations<'source, 'tree> {
+    pub fn choose(&self, rng: &mut impl rand::Rng) -> Variation<'source, 'tree> {
         use rand::seq::SliceRandom;
-        let variation = self.variations.choose(rng).unwrap();
+        Variation {
+            tree: self.tree,
+            node: self.variations.choose(rng).unwrap().clone()
+        }
+    }
 
-        variation.make_moves(self.tree)
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.variations.len()
+    }
+
+    pub fn get(&self, index: usize) -> Variation<'source, 'tree> {
+        Variation {
+            tree: self.tree,
+            node: self.variations[index].clone()
+        }
     }
 }
 
@@ -140,38 +157,38 @@ mod tests {
         let mut tree = super::MoveTree::new();
         tree.add_pgn("e4 e5 Nf3");
         {
-            let variations = tree.get_all_variations().variations;
+            let variations = tree.get_all_variations();
             assert_eq!(variations.len(), 1);
 
-            assert_eq!(variations[0].resolve(&tree), ["e4", "e5", "Nf3"]);
+            assert_eq!(variations.get(0).resolve(), ["e4", "e5", "Nf3"]);
         }
 
         tree.add_pgn("e4 e5 Nc3 Nf6");
         {
-            let variations = tree.get_all_variations().variations;
+            let variations = tree.get_all_variations();
             assert_eq!(variations.len(), 2);
 
-            assert_eq!(variations[0].resolve(&tree), ["e4", "e5", "Nf3"]);
-            assert_eq!(variations[1].resolve(&tree), ["e4", "e5", "Nc3", "Nf6"]);
+            assert_eq!(variations.get(0).resolve(), ["e4", "e5", "Nf3"]);
+            assert_eq!(variations.get(1).resolve(), ["e4", "e5", "Nc3", "Nf6"]);
         }
 
         tree.add_pgn("e4 e5 Nf3 Nf6 Nxe5");
         {
-            let variations = tree.get_all_variations().variations;
+            let variations = tree.get_all_variations();
             assert_eq!(variations.len(), 2);
 
-            assert_eq!(variations[0].resolve(&tree), ["e4", "e5", "Nf3", "Nf6", "Nxe5"]);
-            assert_eq!(variations[1].resolve(&tree), ["e4", "e5", "Nc3", "Nf6"]);
+            assert_eq!(variations.get(0).resolve(), ["e4", "e5", "Nf3", "Nf6", "Nxe5"]);
+            assert_eq!(variations.get(1).resolve(), ["e4", "e5", "Nc3", "Nf6"]);
         }
 
         tree.add_pgn("d4 d5 c4");
         {
-            let variations = tree.get_all_variations().variations;
+            let variations = tree.get_all_variations();
             assert_eq!(variations.len(), 3);
 
-            assert_eq!(variations[0].resolve(&tree), ["e4", "e5", "Nf3", "Nf6", "Nxe5"]);
-            assert_eq!(variations[1].resolve(&tree), ["e4", "e5", "Nc3", "Nf6"]);
-            assert_eq!(variations[2].resolve(&tree), ["d4", "d5", "c4"]);
+            assert_eq!(variations.get(0).resolve(), ["e4", "e5", "Nf3", "Nf6", "Nxe5"]);
+            assert_eq!(variations.get(1).resolve(), ["e4", "e5", "Nc3", "Nf6"]);
+            assert_eq!(variations.get(2).resolve(), ["d4", "d5", "c4"]);
         }
     }
 
@@ -180,12 +197,12 @@ mod tests {
         let mut tree = super::MoveTree::new();
         tree.add_pgn("e4 (d4 d5 c4) e5 Nf3 (Nc3 Nf6) Nf6 Nxe5");
         {
-            let variations = tree.get_all_variations().variations;
+            let variations = tree.get_all_variations();
             assert_eq!(variations.len(), 3);
 
-            assert_eq!(variations[0].resolve(&tree), ["e4", "e5", "Nf3", "Nf6", "Nxe5"]);
-            assert_eq!(variations[1].resolve(&tree), ["e4", "e5", "Nc3", "Nf6"]);
-            assert_eq!(variations[2].resolve(&tree), ["d4", "d5", "c4"]);
+            assert_eq!(variations.get(0).resolve(), ["e4", "e5", "Nf3", "Nf6", "Nxe5"]);
+            assert_eq!(variations.get(1).resolve(), ["e4", "e5", "Nc3", "Nf6"]);
+            assert_eq!(variations.get(2).resolve(), ["d4", "d5", "c4"]);
         }
     }
 }
