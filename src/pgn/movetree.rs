@@ -10,7 +10,7 @@ pub struct MoveTree<'source>(Tree<'source>);
 #[derive(Clone)]
 pub struct Variation<'source> {
     tree: Rc<MoveTree<'source>>,
-    nodes: Vec<Rc<Node<'source>>>
+    node: Rc<Node<'source>>
 }
 
 
@@ -88,12 +88,16 @@ impl<'source> MoveTree<'source> {
 }
 
 impl<'source> Variation<'source> {
-    fn new(tree: Rc<MoveTree<'source>>, target_node: Rc<Node<'source>>) -> Self {
+    fn new(tree: Rc<MoveTree<'source>>, node: Rc<Node<'source>>) -> Self {
+        Self { tree, node }
+    }
+
+    fn resolve_nodes(&self) -> Vec<Rc<Node<'source>>> {
         let count = {
             let mut count = 0;
-            let mut node = target_node.clone();
+            let mut node = self.node.clone();
 
-            while let Some(parent) = node.try_get_parent(&tree.0) {
+            while let Some(parent) = node.try_get_parent(&self.tree.0) {
                 count = count + 1;
                 node = parent;
             }
@@ -104,22 +108,20 @@ impl<'source> Variation<'source> {
         let mut nodes = Vec::new();
         nodes.reserve_exact(count);
 
-        tree.resolve_variation_internal(target_node, &mut nodes);
+        self.tree.resolve_variation_internal(self.node.clone(), &mut nodes);
 
-        Variation {
-            tree,
-            nodes
-        }
+        nodes
     }
 
     pub fn resolve(&self) -> Vec<&'source str> {
-        self.nodes.iter().map(|node| node.value(&self.tree.0).unwrap()).collect()
+        self.resolve_nodes().iter().map(|node| node.value(&self.tree.0).unwrap()).collect()
     }
 
-    pub fn iter<'a>(&'a self) -> VariationIterator<'source, 'a> {
+    pub fn iter(&self) -> VariationIterator<'source> {
         VariationIterator {
-            variation: self,
-            node_iter: self.nodes.iter(),
+            tree: self.tree.clone(),
+            nodes: self.resolve_nodes(),
+            index: 0,
             pos: Default::default()
         }
     }
@@ -141,20 +143,23 @@ impl<'source> Variations<'source> {
     }
 }
 
-pub struct VariationIterator<'source, 'a> {
-    variation: &'a Variation<'source>,
-    node_iter: std::slice::Iter<'a, Rc<Node<'source>>>,
+pub struct VariationIterator<'source> {
+    tree: Rc<MoveTree<'source>>,
+    nodes: Vec<Rc<Node<'source>>>,
+    index: usize,
     pos: shakmaty::Chess
 }
 
-impl<'source, 'a> Iterator for VariationIterator<'source, 'a> {
+impl<'source, 'a> Iterator for VariationIterator<'source> {
     type Item = shakmaty::Move;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.node_iter.next() {
+        match self.nodes.get(self.index) {
             None => None,
             Some(node) => {
-                let m = node.value(&self.variation.tree.0).unwrap();
+                self.index = self.index + 1;
+
+                let m = node.value(&self.tree.0).unwrap();
                 let san: shakmaty::san::San = m.parse().unwrap();
                 let m = san.to_move(&self.pos).unwrap();
     
@@ -167,13 +172,13 @@ impl<'source, 'a> Iterator for VariationIterator<'source, 'a> {
     }
 }
 
-impl<'source, 'a> VariationIterator<'source, 'a> {
+impl<'source> VariationIterator<'source> {
     /// Gets the next move in the current variation, if any
     pub fn peek(&self) -> Option<shakmaty::Move> {
-        match self.node_iter.clone().next() {
+        match self.nodes.get(self.index) {
             None => None,
             Some(node) => {
-                let m = node.value(&self.variation.tree.0).unwrap();
+                let m = node.value(&self.tree.0).unwrap();
                 let san: shakmaty::san::San = m.parse().unwrap();
                 let m = san.to_move(&self.pos).unwrap();
 
@@ -184,12 +189,12 @@ impl<'source, 'a> VariationIterator<'source, 'a> {
 
     /// Gets all moves from the current position by looking at all variations, not just this one
     pub fn peek_all(&self) -> Vec<shakmaty::Move> {
-        match self.node_iter.clone().next() {
+        match self.nodes.get(self.index) {
             None => Vec::new(),
             Some(node) => {
-                let parent = node.try_get_parent(&self.variation.tree.0).unwrap();
-                parent.get_children(&self.variation.tree.0).iter().map(|node| {
-                    let m = node.value(&self.variation.tree.0).unwrap();
+                let parent = node.try_get_parent(&self.tree.0).unwrap();
+                parent.get_children(&self.tree.0).iter().map(|node| {
+                    let m = node.value(&self.tree.0).unwrap();
                     let san: shakmaty::san::San = m.parse().unwrap();
                     san.to_move(&self.pos).unwrap()
                 }).collect()
