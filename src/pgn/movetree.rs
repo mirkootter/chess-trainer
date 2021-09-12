@@ -7,7 +7,6 @@ type Tree<'source> = tree::Tree<&'source str>;
 
 pub struct MoveTree<'source>(Tree<'source>);
 
-#[derive(Clone)]
 pub struct Variation<'source> {
     tree: Rc<MoveTree<'source>>,
     node: Rc<Node<'source>>
@@ -200,6 +199,11 @@ impl<'source> VariationIterator<'source> {
                 }).collect()
             }
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.index  = 0;
+        self.pos = Default::default();
     }
 }
 

@@ -11,6 +11,35 @@ pub trait UI: Clone {
     fn show_hints(&self) -> bool;
 }
 
+#[derive(Clone)]
+struct SharedGame(std::rc::Rc<std::cell::RefCell<crate::pgn::movetree::VariationIterator<'static>>>);
+
+impl SharedGame {
+    pub fn new(variation: &crate::pgn::movetree::Variation<'static>) -> Self {
+        SharedGame(std::rc::Rc::new(variation.iter().into()))
+    }
+
+    pub fn reset(&self) {
+        self.0.borrow_mut().reset();
+    }
+
+    pub fn start_variation(&self, variation: &crate::pgn::movetree::Variation<'static>) {
+        *self.0.borrow_mut() = variation.iter();
+    }
+
+    pub fn next(&self) -> Option<shakmaty::Move> {
+        self.0.borrow_mut().next()
+    }
+
+    pub fn peek(&self) -> Option<shakmaty::Move> {
+        self.0.borrow().peek()
+    }
+
+    pub fn peek_all(&self) -> Vec<shakmaty::Move> {
+        self.0.borrow().peek_all()
+    }
+}
+
 pub async fn train(ui: impl UI + 'static) {
     let mut movetree = crate::pgn::movetree::MoveTree::new();
     movetree.add_pgn(include_str!("../data/stafford.pgn"));
@@ -35,22 +64,22 @@ pub async fn train(ui: impl UI + 'static) {
     };
 
     let mut random = rand::thread_rng();
-    let mut variation = variations.choose(&mut random);
+    let game = SharedGame::new(&variations.choose(&mut random));
 
     loop {
-        let training = train_moves(ui.clone(), variation.clone());
+        let training = train_moves(ui.clone(), game.clone());
         let training = crate::util::spawn_local_cancellable(training);
 
         match wait_for_user_action().await {
-            UserAction::NextLevel => { variation = variations.choose(&mut random); },
-            UserAction::Restart => { }
+            UserAction::NextLevel => { game.start_variation(&variations.choose(&mut random)); },
+            UserAction::Restart => { game.reset(); }
         }
 
         training.cancel();
     }
 }
 
-pub async fn train_moves(ui: impl UI, variation: crate::pgn::movetree::Variation<'static>) {
+async fn train_moves(ui: impl UI, game: SharedGame) {
     let explore = false; // TODO
 
     let ui_trainer_move = |m: shakmaty::Move, hint: Option<shakmaty::Move>| {
@@ -65,23 +94,21 @@ pub async fn train_moves(ui: impl UI, variation: crate::pgn::movetree::Variation
 
     ui.restart();
 
-    let mut iter = variation.iter();
-
     let mut current_player = Player::Trainer; // Trainer plays white and makes the first move
 
     loop {
         if explore {
-            let arrows = iter.peek_all().iter().map::<crate::components::board::Arrow, _>(|m| m.into()).collect();
+            let arrows = game.peek_all().iter().map::<crate::components::board::Arrow, _>(|m| m.into()).collect();
             ui.update_arrows(arrows);
             let user_move = ui.get_user_move().await;
 
             // TODO: Obviously we should not ignore the user's move choice
             // TODO: Only show the errors if hints are on or for trainer moves
-            if let Some(next_move) = iter.next() {
+            if let Some(next_move) = game.next() {
                 ui.play_move(next_move, Vec::new());
             }
         } else {
-            let expected_move = match iter.next() {
+            let expected_move = match game.next() {
                 Some(m) => m,
                 None => break
             };
@@ -89,7 +116,7 @@ pub async fn train_moves(ui: impl UI, variation: crate::pgn::movetree::Variation
             match current_player {
                 Player::Trainer => {
                     crate::util::sleep(150).await;
-                    ui_trainer_move(expected_move, iter.peek());
+                    ui_trainer_move(expected_move, game.peek());
                 },
                 Player::Student => {
                     let mut errors = 0;
