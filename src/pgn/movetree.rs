@@ -2,9 +2,13 @@ use super::tree;
 use super::lexer::{Token, TokenIterator};
 use std::rc::Rc;
 
-pub struct MoveTree<'source>(tree::Tree<&'source str>);
+type Node<'source> = tree::Node<&'source str>;
+type Tree<'source> = tree::Tree<&'source str>;
 
-pub struct Variation<'source>(Rc<tree::Node<&'source str>>);
+pub struct MoveTree<'source>(Tree<'source>);
+pub struct Variation<'source>(Rc<Node<'source>>);
+
+
 pub struct Variations<'source, 'tree> {
     tree: &'tree MoveTree<'source>,
     variations: Vec<Variation<'source>>
@@ -12,7 +16,7 @@ pub struct Variations<'source, 'tree> {
 
 impl<'source> MoveTree<'source> {
     pub fn new() -> Self {
-        MoveTree(tree::Tree::new())
+        MoveTree(Tree::new())
     }
 
     pub fn add_pgn(&mut self, pgn: &'source str) {
@@ -22,7 +26,7 @@ impl<'source> MoveTree<'source> {
         self.parse_internal(root, &mut iter);
     }
 
-    fn parse_internal(&mut self, node: Rc<tree::Node<&'source str>>, iter: &mut TokenIterator<'source>) {
+    fn parse_internal(&mut self, node: Rc<Node<'source>>, iter: &mut TokenIterator<'source>) {
         let mut main = node;
         let mut start_variation = false;
         while let Some(token) = iter.next() {
@@ -58,7 +62,7 @@ impl<'source> MoveTree<'source> {
         }
     }
 
-    fn get_all_variations_from_node(&self, node: &Rc<tree::Node<&'source str>>, result: &mut Vec<Variation<'source>>) {
+    fn get_all_variations_from_node(&self, node: &Rc<Node<'source>>, result: &mut Vec<Variation<'source>>) {
         let children = node.get_children(&self.0);
         if children.is_empty() {
             result.push(Variation(node.clone()));
@@ -70,7 +74,7 @@ impl<'source> MoveTree<'source> {
         }
     }
 
-    fn resolve_variation_internal(&self, node: &tree::Node<&'source str>, result: &mut Vec<&'source str>) {
+    fn resolve_variation_internal(&self, node: &Node<'source>, result: &mut Vec<&'source str>) {
         if let Some(parent) = node.try_get_parent(&self.0) {
             self.resolve_variation_internal(&parent, result);
             result.push(node.value(&self.0).unwrap());
