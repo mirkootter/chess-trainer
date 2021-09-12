@@ -5,7 +5,7 @@ mod trainer;
 mod util;
 
 enum GameMessage {
-    Restart,
+    Init(shakmaty::Chess, bool),
     PlayMove(shakmaty::Move, Vec<components::board::Arrow>),
     UpdateArrows(Vec<components::board::Arrow>),
     SetLearning(bool)
@@ -21,7 +21,8 @@ struct Game {
     user_move_channel: util::EventChannel<shakmaty::Move>,
     user_action_channel: util::EventChannel<trainer::UserAction>,
     learning_input_ref: yew::NodeRef,
-    learning: bool
+    learning: bool,
+    explore: bool
 }
 
 impl Component for Game {
@@ -37,15 +38,17 @@ impl Component for Game {
             user_move_channel: util::EventChannel::new(),
             user_action_channel: util::EventChannel::new(),
             learning_input_ref: Default::default(),
-            learning: true
+            learning: true,
+            explore: false
         }
     }
 
     fn update(&mut self, msg: Self::Message) -> ShouldRender {
         match msg {
-            GameMessage::Restart => {
-                self.board = Default::default();
+            GameMessage::Init(board, explore) => {
+                self.board = board.into();
                 self.arrows = Vec::new();
+                self.explore = explore;
                 true
             },
             GameMessage::PlayMove(m, arrows) => {
@@ -94,6 +97,12 @@ impl Component for Game {
             }
         });
 
+        let explore_icon = if self.explore {
+            "images/icons/explore_off_black_24dp.svg"
+        } else {
+            "images/icons/explore_black_24dp.svg"
+        };
+
         html! {
             <div class="game">
                 <div class="game-header">
@@ -111,6 +120,10 @@ impl Component for Game {
                     reverse=true />
                 <div class="desktop-flex-break" />
                 <div class="game-footer">
+                    <components::iconbutton::IconButton
+                        disabled=false
+                        image=explore_icon
+                        onclick=self.user_action_channel.callback_constant(trainer::UserAction::ToggleExplore) />
                     <components::iconbutton::IconButton
                         disabled=false
                         image="images/icons/refresh_black_24dp.svg"
@@ -132,8 +145,8 @@ struct UI {
 }
 
 impl trainer::UI for UI {
-    fn restart(&self) {
-        self.link.send_message(GameMessage::Restart);
+    fn init(&self, pos: &'_ shakmaty::Chess, explore: bool) {
+        self.link.send_message(GameMessage::Init(pos.clone(), explore));
     }
 
     fn play_move(&self, m: shakmaty::Move, arrows: Vec<components::board::Arrow>) {

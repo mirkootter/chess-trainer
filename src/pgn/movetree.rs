@@ -112,6 +112,7 @@ impl<'source> Variation<'source> {
         nodes
     }
 
+    #[cfg(test)]
     pub fn resolve(&self) -> Vec<&'source str> {
         self.resolve_nodes().iter().map(|node| node.value(&self.tree.0).unwrap()).collect()
     }
@@ -132,11 +133,13 @@ impl<'source> Variations<'source> {
         Variation::new(self.tree.clone(), self.variations.choose(rng).unwrap().clone())
     }
 
+    #[cfg(test)]
     #[inline]
     pub fn len(&self) -> usize {
         self.variations.len()
     }
 
+    #[cfg(test)]
     pub fn get(&self, index: usize) -> Variation<'source> {
         Variation::new(self.tree.clone(), self.variations[index].clone())
     }
@@ -228,6 +231,10 @@ impl<'source> VariationIterator<'source> {
 
     pub fn try_switch(&mut self, m: &shakmaty::Move) -> bool {
         self.try_switch_internal(m).is_some()
+    }
+
+    pub fn position(&self) -> &shakmaty::Chess {
+        &self.pos
     }
 }
 

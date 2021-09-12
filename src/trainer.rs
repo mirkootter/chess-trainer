@@ -1,7 +1,7 @@
 use crate::util::DynFuture;
 
 pub trait UI: Clone {
-    fn restart(&self);
+    fn init(&self, pos: &shakmaty::Chess, explore: bool);
     fn play_move(&self, m: shakmaty::Move, arrows: Vec<crate::components::board::Arrow>);
     fn update_arrows(&self, arrows: Vec<crate::components::board::Arrow>);
     fn shake(&self);
@@ -13,7 +13,8 @@ pub trait UI: Clone {
 #[derive(Clone)]
 pub enum UserAction {
     Restart,
-    NextLevel
+    NextLevel,
+    ToggleExplore
 }
 
 #[derive(Clone)]
@@ -21,14 +22,16 @@ struct SharedGame(std::rc::Rc<std::cell::RefCell<GameInner>>);
 
 struct GameInner {
     iter: crate::pgn::movetree::VariationIterator<'static>,
-    last_turn: Player
+    last_turn: Player,
+    explore: bool
 }
 
 impl GameInner {
     fn new(variation: &crate::pgn::movetree::Variation<'static>) -> Self {
         GameInner {
             iter: variation.iter(),
-            last_turn: Player::Student // We want to the trainer to play
+            last_turn: Player::Trainer, // We want to the trainer to play,
+            explore: false
         }
     }
 }
@@ -42,16 +45,20 @@ impl SharedGame {
         self.0.borrow().last_turn
     }
 
+    pub fn is_explore(&self) -> bool {
+        self.0.borrow().explore
+    }
+
     pub fn reset(&self) {
         let mut inner = self.0.borrow_mut();
         inner.iter.reset();
-        inner.last_turn = Player::Student;
+        inner.last_turn = Player::Trainer;
     }
 
     pub fn start_variation(&self, variation: &crate::pgn::movetree::Variation<'static>) {
         let mut inner = self.0.borrow_mut();
         inner.iter = variation.iter();
-        inner.last_turn = Player::Student;
+        inner.last_turn = Player::Trainer;
     }
 
     pub fn next(&self) -> Option<shakmaty::Move> {
@@ -71,6 +78,15 @@ impl SharedGame {
     pub fn try_switch(&self, m: &shakmaty::Move) -> bool {
         self.0.borrow_mut().iter.try_switch(m)
     }
+
+    pub fn toggle_explore(&self) {
+        let mut inner = self.0.borrow_mut();
+        inner.explore = !inner.explore;
+    }
+
+    pub fn position(&self) -> std::cell::Ref<shakmaty::Chess> {
+        std::cell::Ref::map(self.0.borrow(), |inner| inner.iter.position())
+    }
 }
 
 pub async fn train(ui: impl UI + 'static) {
@@ -89,7 +105,8 @@ pub async fn train(ui: impl UI + 'static) {
 
         match ui.wait_for_user_action().await {
             UserAction::NextLevel => { game.start_variation(&variations.choose(&mut random)); },
-            UserAction::Restart => { game.reset(); }
+            UserAction::Restart => { game.reset(); },
+            UserAction::ToggleExplore => { game.toggle_explore(); }
         }
 
         training.cancel();
@@ -97,7 +114,7 @@ pub async fn train(ui: impl UI + 'static) {
 }
 
 async fn train_moves(ui: impl UI, game: SharedGame) {
-    let explore = false; // TODO
+    let explore = game.is_explore(); // TODO
 
     let ui_trainer_move = |m: shakmaty::Move, hint: Option<shakmaty::Move>| {
         let mut arrows = vec![(&m).into()];
@@ -109,7 +126,7 @@ async fn train_moves(ui: impl UI, game: SharedGame) {
         ui.play_move(m, arrows);
     };
 
-    ui.restart();
+    ui.init(&game.position(), game.is_explore());
 
     loop {
         if explore {
@@ -129,7 +146,7 @@ async fn train_moves(ui: impl UI, game: SharedGame) {
                 ui.play_move(next_move, Vec::new());
             }
         } else {
-            let expected_move = match game.next() {
+            let expected_move = match game.peek() {
                 Some(m) => m,
                 None => break
             };
@@ -137,6 +154,8 @@ async fn train_moves(ui: impl UI, game: SharedGame) {
             match game.current_player() {
                 Player::Trainer => {
                     crate::util::sleep(150).await;
+
+                    let expected_move = game.next().unwrap();
                     ui_trainer_move(expected_move, game.peek());
                 },
                 Player::Student => {
@@ -157,6 +176,7 @@ async fn train_moves(ui: impl UI, game: SharedGame) {
                         }
                     }
             
+                    let expected_move = game.next().unwrap();
                     ui.play_move(expected_move, Vec::new());
                 }
             }
