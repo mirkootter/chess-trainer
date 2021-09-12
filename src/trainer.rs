@@ -34,14 +34,14 @@ pub async fn train(ui: impl UI + 'static) {
     };
 
     let mut random = rand::thread_rng();
-    let mut moves = variations.choose(&mut random).make_moves();
+    let mut moves: Vec<shakmaty::Move> = variations.choose(&mut random).iter().collect();
 
     loop {
         let training = train_moves(ui.clone(), moves.clone());
         let training = crate::util::spawn_local_cancellable(training);
 
         match wait_for_user_action().await {
-            UserAction::NextLevel => { moves = variations.choose(&mut random).make_moves(); },
+            UserAction::NextLevel => { moves = variations.choose(&mut random).iter().collect(); },
             UserAction::Restart => { }
         }
 

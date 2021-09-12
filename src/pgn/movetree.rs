@@ -115,23 +115,12 @@ impl<'source, 'tree> Variation<'source, 'tree> {
         self.nodes.iter().map(|node| node.value(&self.tree.0).unwrap()).collect()
     }
 
-    pub fn make_moves(&self) -> Vec<shakmaty::Move> {
-        let moves = self.resolve();
-        let mut result = Vec::new();
-        result.reserve_exact(moves.len());
-
-        let mut pos = shakmaty::Chess::default();
-        for m in moves {
-            let san: shakmaty::san::San = m.parse().unwrap();
-            let m = san.to_move(&pos).unwrap();
-    
-            use shakmaty::Position;
-            pos = pos.play(&m).unwrap();
-    
-            result.push(m);    
+    pub fn iter<'a>(&'a self) -> VariationIterator<'source, 'a> {
+        VariationIterator {
+            variation: self,
+            node_iter: self.nodes.iter(),
+            pos: Default::default()
         }
-
-        result
     }
 }
 
@@ -148,6 +137,32 @@ impl<'source, 'tree> Variations<'source, 'tree> {
 
     pub fn get(&self, index: usize) -> Variation<'source, 'tree> {
         Variation::new(self.tree, self.variations[index].clone())
+    }
+}
+
+pub struct VariationIterator<'source, 'a> {
+    variation: &'a Variation<'source, 'a>,
+    node_iter: std::slice::Iter<'a, Rc<Node<'source>>>,
+    pos: shakmaty::Chess
+}
+
+impl<'source, 'a> Iterator for VariationIterator<'source, 'a> {
+    type Item = shakmaty::Move;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.node_iter.next() {
+            None => None,
+            Some(node) => {
+                let m = node.value(&self.variation.tree.0).unwrap();
+                let san: shakmaty::san::San = m.parse().unwrap();
+                let m = san.to_move(&self.pos).unwrap();
+    
+                use shakmaty::Position;
+                self.pos.play_unchecked(&m);
+
+                Some(m)
+            }
+        }
     }
 }
 
