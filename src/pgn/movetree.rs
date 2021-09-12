@@ -9,7 +9,7 @@ pub struct MoveTree<'source>(Tree<'source>);
 
 pub struct Variation<'source, 'tree> {
     tree: &'tree MoveTree<'source>,
-    node: Rc<Node<'source>>
+    nodes: Vec<Rc<Node<'source>>>
 }
 
 
@@ -78,21 +78,21 @@ impl<'source> MoveTree<'source> {
         }
     }
 
-    fn resolve_variation_internal(&self, node: &Node<'source>, result: &mut Vec<&'source str>) {
+    fn resolve_variation_internal(&self, node: Rc<Node<'source>>, result: &'_ mut Vec<Rc<Node<'source>>>) {
         if let Some(parent) = node.try_get_parent(&self.0) {
-            self.resolve_variation_internal(&parent, result);
-            result.push(node.value(&self.0).unwrap());
+            self.resolve_variation_internal(parent, result);
+            result.push(node);
         }
     }
 }
 
 impl<'source, 'tree> Variation<'source, 'tree> {
-    pub fn resolve(&self) -> Vec<&'source str> {
+    fn new(tree: &'tree MoveTree<'source>, target_node: Rc<Node<'source>>) -> Self {
         let count = {
             let mut count = 0;
-            let mut node = self.node.clone();
+            let mut node = target_node.clone();
 
-            while let Some(parent) = node.try_get_parent(&self.tree.0) {
+            while let Some(parent) = node.try_get_parent(&tree.0) {
                 count = count + 1;
                 node = parent;
             }
@@ -100,12 +100,19 @@ impl<'source, 'tree> Variation<'source, 'tree> {
             count
         };
 
-        let mut result = Vec::new();
-        result.reserve_exact(count);
+        let mut nodes = Vec::new();
+        nodes.reserve_exact(count);
 
-        self.tree.resolve_variation_internal(&self.node, &mut result);
+        tree.resolve_variation_internal(target_node, &mut nodes);
 
-        result
+        Variation {
+            tree,
+            nodes
+        }
+    }
+
+    pub fn resolve(&self) -> Vec<&'source str> {
+        self.nodes.iter().map(|node| node.value(&self.tree.0).unwrap()).collect()
     }
 
     pub fn make_moves(&self) -> Vec<shakmaty::Move> {
@@ -131,10 +138,7 @@ impl<'source, 'tree> Variation<'source, 'tree> {
 impl<'source, 'tree> Variations<'source, 'tree> {
     pub fn choose(&self, rng: &mut impl rand::Rng) -> Variation<'source, 'tree> {
         use rand::seq::SliceRandom;
-        Variation {
-            tree: self.tree,
-            node: self.variations.choose(rng).unwrap().clone()
-        }
+        Variation::new(self.tree, self.variations.choose(rng).unwrap().clone())
     }
 
     #[inline]
@@ -143,10 +147,7 @@ impl<'source, 'tree> Variations<'source, 'tree> {
     }
 
     pub fn get(&self, index: usize) -> Variation<'source, 'tree> {
-        Variation {
-            tree: self.tree,
-            node: self.variations[index].clone()
-        }
+        Variation::new(self.tree, self.variations[index].clone())
     }
 }
 
